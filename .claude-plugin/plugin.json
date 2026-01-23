@@ -1,7 +1,6 @@
 {
   "name": "everything-claude-code",
-  "version": "1.2.0",
-  "description": "Complete collection of battle-tested Claude Code configs from an Anthropic hackathon winner - agents, skills, hooks, and rules evolved over 10+ months of intensive daily use",
+  "description": "Complete collection of Claude Code configs for C++20 HPC development - agents, skills, hooks, commands, and rules for high-performance computing with CMake, Google Test, sanitizers, and modern C++ best practices",
   "author": {
     "name": "Affaan Mustafa",
     "url": "https://x.com/affaanmustafa"
@@ -11,6 +10,11 @@
   "license": "MIT",
   "keywords": [
     "claude-code",
+    "cpp",
+    "c++20",
+    "hpc",
+    "cmake",
+    "google-test",
     "agents",
     "skills",
     "hooks",
@@ -18,20 +22,16 @@
     "tdd",
     "code-review",
     "security",
-    "workflow",
-    "automation",
-    "best-practices"
+    "sanitizers",
+    "performance"
   ],
   "skills": ["./skills/", "./commands/"],
   "agents": [
     "./agents/architect.md",
     "./agents/build-error-resolver.md",
     "./agents/code-reviewer.md",
-    "./agents/database-reviewer.md",
     "./agents/doc-updater.md",
-    "./agents/e2e-runner.md",
-    "./agents/go-build-resolver.md",
-    "./agents/go-reviewer.md",
+    "./agents/integration-test-runner.md",
     "./agents/planner.md",
     "./agents/refactor-cleaner.md",
     "./agents/security-reviewer.md",

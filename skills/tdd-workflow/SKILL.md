@@ -1,19 +1,19 @@
 ---
 name: tdd-workflow
-description: Use this skill when writing new features, fixing bugs, or refactoring code. Enforces test-driven development with 80%+ coverage including unit, integration, and E2E tests.
+description: Use this skill when writing new features, fixing bugs, or refactoring C++20 code. Enforces test-driven development with Google Test/Mock, CMake/CTest integration, and 80%+ coverage via gcov/lcov.
 ---
 
-# Test-Driven Development Workflow
+# Test-Driven Development Workflow (C++20)
 
-This skill ensures all code development follows TDD principles with comprehensive test coverage.
+This skill ensures all C++ code development follows TDD principles with comprehensive test coverage using Google Test and CTest.
 
 ## When to Activate
 
 - Writing new features or functionality
 - Fixing bugs or issues
 - Refactoring existing code
-- Adding API endpoints
-- Creating new components
+- Adding new classes or algorithms
+- Creating new solver components
 
 ## Core Principles
 
@@ -21,365 +21,267 @@ This skill ensures all code development follows TDD principles with comprehensiv
 ALWAYS write tests first, then implement code to make tests pass.
 
 ### 2. Coverage Requirements
-- Minimum 80% coverage (unit + integration + E2E)
+- Minimum 80% coverage (unit + integration)
 - All edge cases covered
 - Error scenarios tested
 - Boundary conditions verified
 
 ### 3. Test Types
 
-#### Unit Tests
-- Individual functions and utilities
-- Component logic
-- Pure functions
-- Helpers and utilities
+#### Unit Tests (Google Test)
+- Individual functions and classes
+- Template instantiations
+- Algorithm correctness
+- Edge cases and error paths
 
-#### Integration Tests
-- API endpoints
-- Database operations
-- Service interactions
-- External API calls
+#### Integration Tests (CTest)
+- Multi-component interactions
+- I/O operations
+- MPI communication patterns
+- End-to-end solver pipelines
 
-#### E2E Tests (Playwright)
-- Critical user flows
-- Complete workflows
-- Browser automation
-- UI interactions
+#### Performance Tests
+- Scalability benchmarks
+- Cache efficiency validation
+- Regression detection
 
 ## TDD Workflow Steps
 
-### Step 1: Write User Journeys
-```
-As a [role], I want to [action], so that [benefit]
+### Step 1: Define Interface
+```cpp
+// include/project/solver/cg_solver.hpp
+#pragma once
+#include <span>
 
-Example:
-As a user, I want to search for markets semantically,
-so that I can find relevant markets even without exact keywords.
-```
+namespace hpc::solver {
 
-### Step 2: Generate Test Cases
-For each user journey, create comprehensive test cases:
+struct CgConfig {
+  int max_iter = 1000;
+  double tolerance = 1e-10;
+};
 
-```typescript
-describe('Semantic Search', () => {
-  it('returns relevant markets for query', async () => {
-    // Test implementation
-  })
+class CgSolver {
+public:
+  explicit CgSolver(CgConfig config = {});
 
-  it('handles empty query gracefully', async () => {
-    // Test edge case
-  })
+  /// @return Number of iterations performed.
+  [[nodiscard]] int Solve(std::span<double> x, std::span<const double> b);
 
-  it('falls back to substring search when Redis unavailable', async () => {
-    // Test fallback behavior
-  })
+  [[nodiscard]] double Residual() const;
 
-  it('sorts results by similarity score', async () => {
-    // Test sorting logic
-  })
-})
+private:
+  CgConfig config_;
+  double residual_ = 0.0;
+};
+
+}  // namespace hpc::solver
 ```
 
-### Step 3: Run Tests (They Should Fail)
-```bash
-npm test
-# Tests should fail - we haven't implemented yet
-```
+### Step 2: Write Failing Test (RED)
+```cpp
+// tests/unit/test_cg_solver.cpp
+#include <gtest/gtest.h>
+#include "project/solver/cg_solver.hpp"
 
-### Step 4: Implement Code
-Write minimal code to make tests pass:
+namespace hpc::solver {
+namespace {
 
-```typescript
-// Implementation guided by tests
-export async function searchMarkets(query: string) {
-  // Implementation here
+class CgSolverTest : public ::testing::Test {
+protected:
+  void SetUp() override {
+    // Identity system: solution is b itself
+    b_ = {1.0, 2.0, 3.0};
+    x_.resize(b_.size(), 0.0);
+  }
+
+  std::vector<double> x_;
+  std::vector<double> b_;
+};
+
+TEST_F(CgSolverTest, SolvesIdentitySystem) {
+  CgSolver solver({.max_iter = 100, .tolerance = 1e-12});
+  int iters = solver.Solve(x_, b_);
+
+  EXPECT_LE(iters, 1);
+  EXPECT_NEAR(x_[0], 1.0, 1e-10);
+  EXPECT_NEAR(x_[1], 2.0, 1e-10);
+  EXPECT_NEAR(x_[2], 3.0, 1e-10);
 }
+
+TEST_F(CgSolverTest, ReportsResidual) {
+  CgSolver solver;
+  solver.Solve(x_, b_);
+
+  EXPECT_LT(solver.Residual(), 1e-10);
+}
+
+TEST_F(CgSolverTest, RespectsMaxIterations) {
+  CgSolver solver({.max_iter = 2, .tolerance = 1e-20});
+  int iters = solver.Solve(x_, b_);
+
+  EXPECT_LE(iters, 2);
+}
+
+TEST_F(CgSolverTest, HandlesEmptyInput) {
+  CgSolver solver;
+  std::vector<double> empty_x, empty_b;
+
+  int iters = solver.Solve(empty_x, empty_b);
+  EXPECT_EQ(iters, 0);
+}
+
+}  // namespace
+}  // namespace hpc::solver
 ```
 
-### Step 5: Run Tests Again
+### Step 3: Run Test (Verify FAIL)
 ```bash
-npm test
-# Tests should now pass
+cmake -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build -R test_cg_solver --output-on-failure
+# Tests should FAIL - not implemented yet
 ```
 
-### Step 6: Refactor
-Improve code quality while keeping tests green:
-- Remove duplication
-- Improve naming
-- Optimize performance
-- Enhance readability
+### Step 4: Implement Minimal Code (GREEN)
+```cpp
+// src/solver/cg_solver.cpp
+#include "project/solver/cg_solver.hpp"
+#include <cmath>
+#include <numeric>
+
+namespace hpc::solver {
+
+CgSolver::CgSolver(CgConfig config) : config_(config) {}
+
+int CgSolver::Solve(std::span<double> x, std::span<const double> b) {
+  if (x.empty()) return 0;
+
+  // Minimal implementation for identity system
+  std::copy(b.begin(), b.end(), x.begin());
+  residual_ = 0.0;
+  return 1;
+}
+
+double CgSolver::Residual() const { return residual_; }
+
+}  // namespace hpc::solver
+```
+
+### Step 5: Run Test (Verify PASS)
+```bash
+cmake --build build
+ctest --test-dir build -R test_cg_solver --output-on-failure
+# All tests should PASS
+```
+
+### Step 6: Refactor (IMPROVE)
+Improve implementation while keeping tests green.
 
 ### Step 7: Verify Coverage
 ```bash
-npm run test:coverage
-# Verify 80%+ coverage achieved
+cmake -B build-cov -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+cmake --build build-cov
+ctest --test-dir build-cov
+lcov --capture --directory build-cov --output-file coverage.info
+lcov --remove coverage.info '/usr/*' '*/test/*' --output-file coverage.info
+genhtml coverage.info --output-directory coverage_report
+# Verify 80%+ coverage
 ```
 
-## Testing Patterns
+## Google Mock Integration
 
-### Unit Test Pattern (Jest/Vitest)
-```typescript
-import { render, screen, fireEvent } from '@testing-library/react'
-import { Button } from './Button'
+### Mocking Interfaces
+```cpp
+#include <gmock/gmock.h>
+#include "project/io/data_reader.hpp"
 
-describe('Button Component', () => {
-  it('renders with correct text', () => {
-    render(<Button>Click me</Button>)
-    expect(screen.getByText('Click me')).toBeInTheDocument()
-  })
+class MockDataReader : public IDataReader {
+public:
+  MOCK_METHOD(std::vector<double>, ReadVector, (const std::string& path), (override));
+  MOCK_METHOD(bool, FileExists, (const std::string& path), (const, override));
+};
 
-  it('calls onClick when clicked', () => {
-    const handleClick = jest.fn()
-    render(<Button onClick={handleClick}>Click</Button>)
+TEST(SolverIntegration, HandlesIOFailure) {
+  MockDataReader reader;
+  EXPECT_CALL(reader, FileExists("input.dat"))
+      .WillOnce(::testing::Return(false));
 
-    fireEvent.click(screen.getByRole('button'))
-
-    expect(handleClick).toHaveBeenCalledTimes(1)
-  })
-
-  it('is disabled when disabled prop is true', () => {
-    render(<Button disabled>Click</Button>)
-    expect(screen.getByRole('button')).toBeDisabled()
-  })
-})
+  Solver solver(&reader);
+  EXPECT_THROW(solver.LoadAndSolve("input.dat"), std::runtime_error);
+}
 ```
 
-### API Integration Test Pattern
-```typescript
-import { NextRequest } from 'next/server'
-import { GET } from './route'
+### Parameterized Tests
+```cpp
+class NormTest : public ::testing::TestWithParam<
+    std::tuple<std::vector<double>, double>> {};
 
-describe('GET /api/markets', () => {
-  it('returns markets successfully', async () => {
-    const request = new NextRequest('http://localhost/api/markets')
-    const response = await GET(request)
-    const data = await response.json()
+TEST_P(NormTest, ComputesCorrectly) {
+  auto [input, expected] = GetParam();
+  EXPECT_NEAR(ComputeL2Norm(input), expected, 1e-10);
+}
 
-    expect(response.status).toBe(200)
-    expect(data.success).toBe(true)
-    expect(Array.isArray(data.data)).toBe(true)
-  })
-
-  it('validates query parameters', async () => {
-    const request = new NextRequest('http://localhost/api/markets?limit=invalid')
-    const response = await GET(request)
-
-    expect(response.status).toBe(400)
-  })
-
-  it('handles database errors gracefully', async () => {
-    // Mock database failure
-    const request = new NextRequest('http://localhost/api/markets')
-    // Test error handling
-  })
-})
+INSTANTIATE_TEST_SUITE_P(NormCases, NormTest,
+    ::testing::Values(
+        std::make_tuple(std::vector<double>{3.0, 4.0}, 5.0),
+        std::make_tuple(std::vector<double>{1.0, 0.0}, 1.0),
+        std::make_tuple(std::vector<double>{}, 0.0)
+    ));
 ```
 
-### E2E Test Pattern (Playwright)
-```typescript
-import { test, expect } from '@playwright/test'
+## CMakeLists.txt for Tests
 
-test('user can search and filter markets', async ({ page }) => {
-  // Navigate to markets page
-  await page.goto('/')
-  await page.click('a[href="/markets"]')
+```cmake
+# tests/CMakeLists.txt
+include(FetchContent)
 
-  // Verify page loaded
-  await expect(page.locator('h1')).toContainText('Markets')
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.14.0
+)
+FetchContent_MakeAvailable(googletest)
 
-  // Search for markets
-  await page.fill('input[placeholder="Search markets"]', 'election')
+enable_testing()
 
-  // Wait for debounce and results
-  await page.waitForTimeout(600)
+# Unit tests
+add_executable(test_cg_solver unit/test_cg_solver.cpp)
+target_link_libraries(test_cg_solver PRIVATE
+  project::solver
+  GTest::gtest_main
+  GTest::gmock
+)
+add_test(NAME test_cg_solver COMMAND test_cg_solver)
 
-  // Verify search results displayed
-  const results = page.locator('[data-testid="market-card"]')
-  await expect(results).toHaveCount(5, { timeout: 5000 })
-
-  // Verify results contain search term
-  const firstResult = results.first()
-  await expect(firstResult).toContainText('election', { ignoreCase: true })
-
-  // Filter by status
-  await page.click('button:has-text("Active")')
-
-  // Verify filtered results
-  await expect(results).toHaveCount(3)
-})
-
-test('user can create a new market', async ({ page }) => {
-  // Login first
-  await page.goto('/creator-dashboard')
-
-  // Fill market creation form
-  await page.fill('input[name="name"]', 'Test Market')
-  await page.fill('textarea[name="description"]', 'Test description')
-  await page.fill('input[name="endDate"]', '2025-12-31')
-
-  // Submit form
-  await page.click('button[type="submit"]')
-
-  // Verify success message
-  await expect(page.locator('text=Market created successfully')).toBeVisible()
-
-  // Verify redirect to market page
-  await expect(page).toHaveURL(/\/markets\/test-market/)
-})
+# Integration tests (labeled)
+add_executable(test_solver_pipeline integration/test_solver_pipeline.cpp)
+target_link_libraries(test_solver_pipeline PRIVATE
+  project::solver
+  project::io
+  GTest::gtest_main
+)
+add_test(NAME test_solver_pipeline COMMAND test_solver_pipeline)
+set_tests_properties(test_solver_pipeline PROPERTIES LABELS "integration")
 ```
 
 ## Test File Organization
 
 ```
-src/
-├── components/
-│   ├── Button/
-│   │   ├── Button.tsx
-│   │   ├── Button.test.tsx          # Unit tests
-│   │   └── Button.stories.tsx       # Storybook
-│   └── MarketCard/
-│       ├── MarketCard.tsx
-│       └── MarketCard.test.tsx
-├── app/
-│   └── api/
-│       └── markets/
-│           ├── route.ts
-│           └── route.test.ts         # Integration tests
-└── e2e/
-    ├── markets.spec.ts               # E2E tests
-    ├── trading.spec.ts
-    └── auth.spec.ts
-```
-
-## Mocking External Services
-
-### Supabase Mock
-```typescript
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => Promise.resolve({
-          data: [{ id: 1, name: 'Test Market' }],
-          error: null
-        }))
-      }))
-    }))
-  }
-}))
-```
-
-### Redis Mock
-```typescript
-jest.mock('@/lib/redis', () => ({
-  searchMarketsByVector: jest.fn(() => Promise.resolve([
-    { slug: 'test-market', similarity_score: 0.95 }
-  ])),
-  checkRedisHealth: jest.fn(() => Promise.resolve({ connected: true }))
-}))
-```
-
-### OpenAI Mock
-```typescript
-jest.mock('@/lib/openai', () => ({
-  generateEmbedding: jest.fn(() => Promise.resolve(
-    new Array(1536).fill(0.1) // Mock 1536-dim embedding
-  ))
-}))
-```
-
-## Test Coverage Verification
-
-### Run Coverage Report
-```bash
-npm run test:coverage
-```
-
-### Coverage Thresholds
-```json
-{
-  "jest": {
-    "coverageThresholds": {
-      "global": {
-        "branches": 80,
-        "functions": 80,
-        "lines": 80,
-        "statements": 80
-      }
-    }
-  }
-}
-```
-
-## Common Testing Mistakes to Avoid
-
-### ❌ WRONG: Testing Implementation Details
-```typescript
-// Don't test internal state
-expect(component.state.count).toBe(5)
-```
-
-### ✅ CORRECT: Test User-Visible Behavior
-```typescript
-// Test what users see
-expect(screen.getByText('Count: 5')).toBeInTheDocument()
-```
-
-### ❌ WRONG: Brittle Selectors
-```typescript
-// Breaks easily
-await page.click('.css-class-xyz')
-```
-
-### ✅ CORRECT: Semantic Selectors
-```typescript
-// Resilient to changes
-await page.click('button:has-text("Submit")')
-await page.click('[data-testid="submit-button"]')
-```
-
-### ❌ WRONG: No Test Isolation
-```typescript
-// Tests depend on each other
-test('creates user', () => { /* ... */ })
-test('updates same user', () => { /* depends on previous test */ })
-```
-
-### ✅ CORRECT: Independent Tests
-```typescript
-// Each test sets up its own data
-test('creates user', () => {
-  const user = createTestUser()
-  // Test logic
-})
-
-test('updates user', () => {
-  const user = createTestUser()
-  // Update logic
-})
-```
-
-## Continuous Testing
-
-### Watch Mode During Development
-```bash
-npm test -- --watch
-# Tests run automatically on file changes
-```
-
-### Pre-Commit Hook
-```bash
-# Runs before every commit
-npm test && npm run lint
-```
-
-### CI/CD Integration
-```yaml
-# GitHub Actions
-- name: Run Tests
-  run: npm test -- --coverage
-- name: Upload Coverage
-  uses: codecov/codecov-action@v3
+tests/
+├── CMakeLists.txt
+├── unit/
+│   ├── test_cg_solver.cpp
+│   ├── test_matrix.cpp
+│   ├── test_preconditioner.cpp
+│   └── test_mesh.cpp
+├── integration/
+│   ├── test_solver_pipeline.cpp
+│   ├── test_io_roundtrip.cpp
+│   └── test_mpi_communication.cpp
+└── benchmarks/
+    ├── bench_matvec.cpp
+    └── bench_solver.cpp
 ```
 
 ## Best Practices
@@ -389,20 +291,11 @@ npm test && npm run lint
 3. **Descriptive Test Names** - Explain what's tested
 4. **Arrange-Act-Assert** - Clear test structure
 5. **Mock External Dependencies** - Isolate unit tests
-6. **Test Edge Cases** - Null, undefined, empty, large
+6. **Test Edge Cases** - Empty, zero, max, negative
 7. **Test Error Paths** - Not just happy paths
-8. **Keep Tests Fast** - Unit tests < 50ms each
-9. **Clean Up After Tests** - No side effects
+8. **Keep Tests Fast** - Unit tests < 10ms each
+9. **Clean Up After Tests** - No side effects between tests
 10. **Review Coverage Reports** - Identify gaps
-
-## Success Metrics
-
-- 80%+ code coverage achieved
-- All tests passing (green)
-- No skipped or disabled tests
-- Fast test execution (< 30s for unit tests)
-- E2E tests cover critical user flows
-- Tests catch bugs before production
 
 ---
 

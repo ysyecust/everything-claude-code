@@ -12,7 +12,7 @@ const fs = require('fs');
 const testsDir = __dirname;
 const testFiles = [
   'lib/utils.test.js',
-  'lib/package-manager.test.js',
+  'lib/build-system.test.js',
   'hooks/hooks.test.js'
 ];
 

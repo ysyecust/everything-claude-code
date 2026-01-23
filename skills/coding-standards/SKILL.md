@@ -1,19 +1,19 @@
 ---
 name: coding-standards
-description: Universal coding standards, best practices, and patterns for TypeScript, JavaScript, React, and Node.js development.
+description: C++20 coding standards, naming conventions, concepts, ranges, constexpr, file organization, and Doxygen documentation practices for high-performance computing.
 ---
 
-# Coding Standards & Best Practices
+# C++20 Coding Standards & Best Practices
 
-Universal coding standards applicable across all projects.
+Universal coding standards for C++20 HPC projects following Google C++ Style and C++ Core Guidelines.
 
 ## Code Quality Principles
 
 ### 1. Readability First
 - Code is read more than written
-- Clear variable and function names
+- Clear variable and function names (Google C++ Style)
 - Self-documenting code preferred over comments
-- Consistent formatting
+- Consistent formatting (clang-format)
 
 ### 2. KISS (Keep It Simple, Stupid)
 - Simplest solution that works
@@ -23,7 +23,7 @@ Universal coding standards applicable across all projects.
 
 ### 3. DRY (Don't Repeat Yourself)
 - Extract common logic into functions
-- Create reusable components
+- Create reusable templates
 - Share utilities across modules
 - Avoid copy-paste programming
 
@@ -33,488 +33,303 @@ Universal coding standards applicable across all projects.
 - Add complexity only when required
 - Start simple, refactor when needed
 
-## TypeScript/JavaScript Standards
+## Naming Conventions (Google C++ Style)
 
-### Variable Naming
+### Types and Classes
 
-```typescript
-// ✅ GOOD: Descriptive names
-const marketSearchQuery = 'election'
-const isUserAuthenticated = true
-const totalRevenue = 1000
+```cpp
+// PascalCase for types
+class ParticleSystem;
+struct MeshConfig;
+enum class IntegrationMethod { kExplicitEuler, kRK4, kVerlet };
 
-// ❌ BAD: Unclear names
-const q = 'election'
-const flag = true
-const x = 1000
+// Template parameters: single uppercase or PascalCase
+template <typename T>
+template <typename ValueType>
 ```
 
-### Function Naming
+### Functions
 
-```typescript
-// ✅ GOOD: Verb-noun pattern
-async function fetchMarketData(marketId: string) { }
-function calculateSimilarity(a: number[], b: number[]) { }
-function isValidEmail(email: string): boolean { }
+```cpp
+// PascalCase for functions
+void ComputeForces(std::span<Particle> particles);
+double CalculateEnergy(const SimState& state);
+[[nodiscard]] bool IsConverged(double residual, double tol);
 
-// ❌ BAD: Unclear or noun-only
-async function market(id: string) { }
-function similarity(a, b) { }
-function email(e) { }
+// Accessors: no Get prefix for simple getters
+class Mesh {
+public:
+  int NumVertices() const { return vertices_.size(); }
+  double TimeStep() const { return dt_; }
+  void SetTimeStep(double dt) { dt_ = dt; }
+};
 ```
 
-### Immutability Pattern (CRITICAL)
+### Variables
 
-```typescript
-// ✅ ALWAYS use spread operator
-const updatedUser = {
-  ...user,
-  name: 'New Name'
-}
+```cpp
+// snake_case for local and function parameters
+int particle_count = 1000;
+double time_step = 0.01;
+const auto& mesh_data = solver.GetMesh();
 
-const updatedArray = [...items, newItem]
+// kPascalCase for constants
+constexpr int kMaxIterations = 10000;
+constexpr double kBoltzmannConstant = 1.380649e-23;
+static constexpr size_t kCacheLineSize = 64;
 
-// ❌ NEVER mutate directly
-user.name = 'New Name'  // BAD
-items.push(newItem)     // BAD
+// Trailing underscore for member variables
+class Solver {
+private:
+  int max_iter_;
+  double tolerance_;
+  std::vector<double> residuals_;
+};
 ```
 
-### Error Handling
+### Namespaces and Files
 
-```typescript
-// ✅ GOOD: Comprehensive error handling
-async function fetchData(url: string) {
-  try {
-    const response = await fetch(url)
+```cpp
+// snake_case for namespaces
+namespace hpc::solver {}
+namespace hpc::io {}
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error('Fetch failed:', error)
-    throw new Error('Failed to fetch data')
-  }
-}
-
-// ❌ BAD: No error handling
-async function fetchData(url) {
-  const response = await fetch(url)
-  return response.json()
-}
+// snake_case for file names
+// particle_system.hpp / particle_system.cpp
+// conjugate_gradient.hpp / conjugate_gradient.cpp
 ```
 
-### Async/Await Best Practices
+## C++20 Concepts
 
-```typescript
-// ✅ GOOD: Parallel execution when possible
-const [users, markets, stats] = await Promise.all([
-  fetchUsers(),
-  fetchMarkets(),
-  fetchStats()
-])
+```cpp
+// Define domain-specific concepts
+template <typename T>
+concept Numeric = std::integral<T> || std::floating_point<T>;
 
-// ❌ BAD: Sequential when unnecessary
-const users = await fetchUsers()
-const markets = await fetchMarkets()
-const stats = await fetchStats()
-```
+template <typename T>
+concept LinearOperator = requires(T op, std::span<double> x, std::span<const double> y) {
+  { op.Apply(x, y) } -> std::same_as<void>;
+  { op.NumRows() } -> std::convertible_to<size_t>;
+  { op.NumCols() } -> std::convertible_to<size_t>;
+};
 
-### Type Safety
+template <typename T>
+concept Serializable = requires(T obj, std::ostream& os, std::istream& is) {
+  { obj.Serialize(os) } -> std::same_as<void>;
+  { T::Deserialize(is) } -> std::same_as<T>;
+};
 
-```typescript
-// ✅ GOOD: Proper types
-interface Market {
-  id: string
-  name: string
-  status: 'active' | 'resolved' | 'closed'
-  created_at: Date
-}
-
-function getMarket(id: string): Promise<Market> {
-  // Implementation
-}
-
-// ❌ BAD: Using 'any'
-function getMarket(id: any): Promise<any> {
-  // Implementation
+// Use concepts as constraints
+template <LinearOperator Op>
+void SolveSystem(const Op& A, std::span<double> x, std::span<const double> b) {
+  // Generic solver implementation
 }
 ```
 
-## React Best Practices
+## C++20 Ranges
 
-### Component Structure
+```cpp
+#include <ranges>
+#include <algorithm>
 
-```typescript
-// ✅ GOOD: Functional component with types
-interface ButtonProps {
-  children: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  variant?: 'primary' | 'secondary'
+// Filter and transform with ranges
+auto active_particles = particles
+    | std::views::filter([](const Particle& p) { return p.IsActive(); })
+    | std::views::transform([](const Particle& p) { return p.Position(); });
+
+// Compose views for data pipelines
+auto high_energy = simulation_data
+    | std::views::filter([threshold](double e) { return e > threshold; })
+    | std::views::take(100);
+
+// Range algorithms
+std::ranges::sort(particles, {}, &Particle::Energy);
+auto it = std::ranges::find_if(nodes, [](const Node& n) { return n.IsLeaf(); });
+double total = std::ranges::fold_left(values, 0.0, std::plus<>{});
+```
+
+## constexpr and Compile-Time Computation
+
+```cpp
+// Compile-time constants
+constexpr double kPi = 3.14159265358979323846;
+constexpr size_t kBlockSize = 256;
+
+// constexpr functions
+constexpr int Factorial(int n) {
+  return n <= 1 ? 1 : n * Factorial(n - 1);
 }
 
-export function Button({
-  children,
-  onClick,
-  disabled = false,
-  variant = 'primary'
-}: ButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`btn btn-${variant}`}
-    >
-      {children}
-    </button>
-  )
+// consteval for guaranteed compile-time evaluation
+consteval size_t AlignTo(size_t size, size_t alignment) {
+  return (size + alignment - 1) & ~(alignment - 1);
 }
 
-// ❌ BAD: No types, unclear structure
-export function Button(props) {
-  return <button onClick={props.onClick}>{props.children}</button>
-}
-```
-
-### Custom Hooks
-
-```typescript
-// ✅ GOOD: Reusable custom hook
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => clearTimeout(handler)
-  }, [value, delay])
-
-  return debouncedValue
-}
-
-// Usage
-const debouncedQuery = useDebounce(searchQuery, 500)
-```
-
-### State Management
-
-```typescript
-// ✅ GOOD: Proper state updates
-const [count, setCount] = useState(0)
-
-// Functional update for state based on previous state
-setCount(prev => prev + 1)
-
-// ❌ BAD: Direct state reference
-setCount(count + 1)  // Can be stale in async scenarios
-```
-
-### Conditional Rendering
-
-```typescript
-// ✅ GOOD: Clear conditional rendering
-{isLoading && <Spinner />}
-{error && <ErrorMessage error={error} />}
-{data && <DataDisplay data={data} />}
-
-// ❌ BAD: Ternary hell
-{isLoading ? <Spinner /> : error ? <ErrorMessage error={error} /> : data ? <DataDisplay data={data} /> : null}
-```
-
-## API Design Standards
-
-### REST API Conventions
-
-```
-GET    /api/markets              # List all markets
-GET    /api/markets/:id          # Get specific market
-POST   /api/markets              # Create new market
-PUT    /api/markets/:id          # Update market (full)
-PATCH  /api/markets/:id          # Update market (partial)
-DELETE /api/markets/:id          # Delete market
-
-# Query parameters for filtering
-GET /api/markets?status=active&limit=10&offset=0
-```
-
-### Response Format
-
-```typescript
-// ✅ GOOD: Consistent response structure
-interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  meta?: {
-    total: number
-    page: number
-    limit: number
-  }
-}
-
-// Success response
-return NextResponse.json({
-  success: true,
-  data: markets,
-  meta: { total: 100, page: 1, limit: 10 }
-})
-
-// Error response
-return NextResponse.json({
-  success: false,
-  error: 'Invalid request'
-}, { status: 400 })
-```
-
-### Input Validation
-
-```typescript
-import { z } from 'zod'
-
-// ✅ GOOD: Schema validation
-const CreateMarketSchema = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().min(1).max(2000),
-  endDate: z.string().datetime(),
-  categories: z.array(z.string()).min(1)
-})
-
-export async function POST(request: Request) {
-  const body = await request.json()
-
-  try {
-    const validated = CreateMarketSchema.parse(body)
-    // Proceed with validated data
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({
-        success: false,
-        error: 'Validation failed',
-        details: error.errors
-      }, { status: 400 })
-    }
+// if constexpr for compile-time branching
+template <typename T>
+void ProcessData(std::span<T> data) {
+  if constexpr (std::is_floating_point_v<T>) {
+    // Vectorized floating-point path
+  } else if constexpr (std::is_integral_v<T>) {
+    // Integer path
   }
 }
 ```
 
 ## File Organization
 
-### Project Structure
+### Header Files (.hpp)
 
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   ├── markets/           # Market pages
-│   └── (auth)/           # Auth pages (route groups)
-├── components/            # React components
-│   ├── ui/               # Generic UI components
-│   ├── forms/            # Form components
-│   └── layouts/          # Layout components
-├── hooks/                # Custom React hooks
-├── lib/                  # Utilities and configs
-│   ├── api/             # API clients
-│   ├── utils/           # Helper functions
-│   └── constants/       # Constants
-├── types/                # TypeScript types
-└── styles/              # Global styles
-```
+```cpp
+#pragma once  // Or include guards
 
-### File Naming
+#include <vector>      // Standard library first
+#include <span>
 
-```
-components/Button.tsx          # PascalCase for components
-hooks/useAuth.ts              # camelCase with 'use' prefix
-lib/formatDate.ts             # camelCase for utilities
-types/market.types.ts         # camelCase with .types suffix
-```
+#include "project/core/types.hpp"  // Project headers second
 
-## Comments & Documentation
+namespace hpc::solver {
 
-### When to Comment
+/// @brief Conjugate Gradient solver for symmetric positive-definite systems.
+///
+/// Solves Ax = b using the preconditioned CG method.
+/// @tparam Precond Preconditioner type satisfying LinearOperator concept.
+template <LinearOperator Precond = IdentityPrecond>
+class ConjugateGradient {
+public:
+  struct Config {
+    int max_iter = 1000;
+    double tolerance = 1e-10;
+    bool verbose = false;
+  };
 
-```typescript
-// ✅ GOOD: Explain WHY, not WHAT
-// Use exponential backoff to avoid overwhelming the API during outages
-const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
+  explicit ConjugateGradient(Config config = {});
 
-// Deliberately using mutation here for performance with large arrays
-items.push(newItem)
+  /// @brief Solve the system Ax = b.
+  /// @param A The system matrix (LinearOperator).
+  /// @param x Solution vector (initial guess on input, solution on output).
+  /// @param b Right-hand side vector.
+  /// @return Number of iterations performed.
+  [[nodiscard]] int Solve(const auto& A, std::span<double> x,
+                          std::span<const double> b);
 
-// ❌ BAD: Stating the obvious
-// Increment counter by 1
-count++
+private:
+  Config config_;
+  Precond precond_;
+};
 
-// Set name to user's name
-name = user.name
+}  // namespace hpc::solver
 ```
 
-### JSDoc for Public APIs
+### Source Files (.cpp)
 
-```typescript
-/**
- * Searches markets using semantic similarity.
- *
- * @param query - Natural language search query
- * @param limit - Maximum number of results (default: 10)
- * @returns Array of markets sorted by similarity score
- * @throws {Error} If OpenAI API fails or Redis unavailable
- *
- * @example
- * ```typescript
- * const results = await searchMarkets('election', 5)
- * console.log(results[0].name) // "Trump vs Biden"
- * ```
- */
-export async function searchMarkets(
-  query: string,
-  limit: number = 10
-): Promise<Market[]> {
+```cpp
+#include "project/solver/conjugate_gradient.hpp"
+
+#include <cmath>
+#include <numeric>
+
+namespace hpc::solver {
+
+template <LinearOperator Precond>
+ConjugateGradient<Precond>::ConjugateGradient(Config config)
+    : config_(std::move(config)) {}
+
+template <LinearOperator Precond>
+int ConjugateGradient<Precond>::Solve(
+    const auto& A, std::span<double> x, std::span<const double> b) {
   // Implementation
 }
+
+}  // namespace hpc::solver
 ```
 
-## Performance Best Practices
+## Doxygen Documentation
 
-### Memoization
+```cpp
+/// @file particle_system.hpp
+/// @brief N-body particle system simulation.
 
-```typescript
-import { useMemo, useCallback } from 'react'
+/// @brief Represents a single particle in the simulation.
+///
+/// Stores position, velocity, and force for a particle
+/// with mass in a 3D domain.
+struct Particle {
+  std::array<double, 3> position;   ///< Position in 3D space [m].
+  std::array<double, 3> velocity;   ///< Velocity [m/s].
+  std::array<double, 3> force;      ///< Accumulated force [N].
+  double mass;                       ///< Particle mass [kg].
+};
 
-// ✅ GOOD: Memoize expensive computations
-const sortedMarkets = useMemo(() => {
-  return markets.sort((a, b) => b.volume - a.volume)
-}, [markets])
-
-// ✅ GOOD: Memoize callbacks
-const handleSearch = useCallback((query: string) => {
-  setSearchQuery(query)
-}, [])
-```
-
-### Lazy Loading
-
-```typescript
-import { lazy, Suspense } from 'react'
-
-// ✅ GOOD: Lazy load heavy components
-const HeavyChart = lazy(() => import('./HeavyChart'))
-
-export function Dashboard() {
-  return (
-    <Suspense fallback={<Spinner />}>
-      <HeavyChart />
-    </Suspense>
-  )
-}
-```
-
-### Database Queries
-
-```typescript
-// ✅ GOOD: Select only needed columns
-const { data } = await supabase
-  .from('markets')
-  .select('id, name, status')
-  .limit(10)
-
-// ❌ BAD: Select everything
-const { data } = await supabase
-  .from('markets')
-  .select('*')
-```
-
-## Testing Standards
-
-### Test Structure (AAA Pattern)
-
-```typescript
-test('calculates similarity correctly', () => {
-  // Arrange
-  const vector1 = [1, 0, 0]
-  const vector2 = [0, 1, 0]
-
-  // Act
-  const similarity = calculateCosineSimilarity(vector1, vector2)
-
-  // Assert
-  expect(similarity).toBe(0)
-})
-```
-
-### Test Naming
-
-```typescript
-// ✅ GOOD: Descriptive test names
-test('returns empty array when no markets match query', () => { })
-test('throws error when OpenAI API key is missing', () => { })
-test('falls back to substring search when Redis unavailable', () => { })
-
-// ❌ BAD: Vague test names
-test('works', () => { })
-test('test search', () => { })
+/// @brief Compute pairwise forces between all particles.
+/// @param particles Span of particles to update.
+/// @param cutoff_radius Maximum interaction distance [m].
+/// @pre All particles must have positive mass.
+/// @post force field of each particle is updated.
+/// @complexity O(N^2) for brute-force, O(N log N) with tree.
+void ComputeForces(std::span<Particle> particles, double cutoff_radius);
 ```
 
 ## Code Smell Detection
 
-Watch for these anti-patterns:
+### 1. Raw new/delete
+```cpp
+// BAD
+auto* p = new Particle[n];
+delete[] p;
 
-### 1. Long Functions
-```typescript
-// ❌ BAD: Function > 50 lines
-function processMarketData() {
-  // 100 lines of code
-}
-
-// ✅ GOOD: Split into smaller functions
-function processMarketData() {
-  const validated = validateData()
-  const transformed = transformData(validated)
-  return saveData(transformed)
-}
+// GOOD
+auto particles = std::make_unique<Particle[]>(n);
+// Or better:
+std::vector<Particle> particles(n);
 ```
 
-### 2. Deep Nesting
-```typescript
-// ❌ BAD: 5+ levels of nesting
-if (user) {
-  if (user.isAdmin) {
-    if (market) {
-      if (market.isActive) {
-        if (hasPermission) {
-          // Do something
+### 2. C-style Casts
+```cpp
+// BAD
+double* ptr = (double*)void_ptr;
+
+// GOOD
+auto* ptr = static_cast<double*>(void_ptr);
+// Or reinterpret_cast when truly needed (with comment explaining why)
+```
+
+### 3. Magic Numbers
+```cpp
+// BAD
+if (iter > 10000) break;
+double dt = 0.001;
+
+// GOOD
+constexpr int kMaxIterations = 10000;
+constexpr double kDefaultTimeStep = 0.001;
+```
+
+### 4. Deep Nesting
+```cpp
+// BAD: 5+ levels
+if (rank == 0) {
+  if (config.verbose) {
+    for (auto& p : particles) {
+      if (p.IsActive()) {
+        if (p.Energy() > threshold) {
+          // ...
         }
       }
     }
   }
 }
 
-// ✅ GOOD: Early returns
-if (!user) return
-if (!user.isAdmin) return
-if (!market) return
-if (!market.isActive) return
-if (!hasPermission) return
+// GOOD: Early returns + ranges
+if (rank != 0 || !config.verbose) return;
 
-// Do something
-```
+auto high_energy = particles
+    | std::views::filter(&Particle::IsActive)
+    | std::views::filter([&](const Particle& p) { return p.Energy() > threshold; });
 
-### 3. Magic Numbers
-```typescript
-// ❌ BAD: Unexplained numbers
-if (retryCount > 3) { }
-setTimeout(callback, 500)
-
-// ✅ GOOD: Named constants
-const MAX_RETRIES = 3
-const DEBOUNCE_DELAY_MS = 500
-
-if (retryCount > MAX_RETRIES) { }
-setTimeout(callback, DEBOUNCE_DELAY_MS)
+for (const auto& p : high_energy) {
+  // ...
+}
 ```
 
 **Remember**: Code quality is not negotiable. Clear, maintainable code enables rapid development and confident refactoring.

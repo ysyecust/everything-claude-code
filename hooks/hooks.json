@@ -3,24 +3,24 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm run dev|pnpm( run)? dev|yarn dev|bun run dev)\"",
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build.*&&.*\\./|make.*&&.*\\./|mpirun)\"",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"console.error('[Hook] BLOCKED: Dev server must run in tmux for log access');console.error('[Hook] Use: tmux new-session -d -s dev \\\"npm run dev\\\"');console.error('[Hook] Then: tmux attach -t dev');process.exit(1)\""
+            "command": "node -e \"console.error('[Hook] BLOCKED: Long-running process must run in tmux for log access');console.error('[Hook] Use: tmux new-session -d -s build \\\"cmake --build build\\\"');console.error('[Hook] Then: tmux attach -t build');process.exit(1)\""
           }
         ],
-        "description": "Block dev servers outside tmux - ensures you can access logs"
+        "description": "Block long-running build/run outside tmux - ensures you can access logs"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm (install|test)|pnpm (install|test)|yarn (install|test)?|bun (install|test)|cargo build|make|docker|pytest|vitest|playwright)\"",
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build|make -j|ctest|mpirun|mpiexec|srun)\"",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"if(!process.env.TMUX){console.error('[Hook] Consider running in tmux for session persistence');console.error('[Hook] tmux new -s dev  |  tmux attach -t dev')}\""
+            "command": "node -e \"if(!process.env.TMUX){console.error('[Hook] Consider running in tmux for session persistence');console.error('[Hook] tmux new -s build  |  tmux attach -t build')}\""
           }
         ],
-        "description": "Reminder to use tmux for long-running commands"
+        "description": "Reminder to use tmux for long-running commands (cmake/make/ctest/mpirun)"
       },
       {
         "matcher": "tool == \"Bash\" && tool_input.command matches \"git push\"",
@@ -74,7 +74,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.js\""
           }
         ],
-        "description": "Load previous context and detect package manager on new session"
+        "description": "Load previous context and detect build system on new session"
       }
     ],
     "PostToolUse": [
@@ -89,7 +89,7 @@
         "description": "Log PR URL and provide review command after PR creation"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(npm run build|pnpm build|yarn build)\"",
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build|make -j|ctest)\"",
         "hooks": [
           {
             "type": "command",
@@ -98,37 +98,37 @@
             "timeout": 30
           }
         ],
-        "description": "Example: async hook for build analysis (runs in background without blocking)"
+        "description": "Async hook for build analysis (runs in background without blocking)"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx|js|jsx)$\"",
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|hpp|cc|h|cxx|hxx)$\"",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const{execFileSync}=require('child_process');const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){try{execFileSync('npx',['prettier','--write',p],{stdio:['pipe','pipe','pipe']})}catch(e){}}console.log(d)})\""
+            "command": "node -e \"const{execFileSync}=require('child_process');const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){try{execFileSync('clang-format',['--style=Google','-i',p],{stdio:['pipe','pipe','pipe']})}catch(e){}}console.log(d)})\""
           }
         ],
-        "description": "Auto-format JS/TS files with Prettier after edits"
+        "description": "Auto-format C++ files with clang-format (Google style) after edits"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx)$\"",
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|cc|cxx)$\"",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const{execSync}=require('child_process');const fs=require('fs');const path=require('path');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){let dir=path.dirname(p);while(dir!==path.dirname(dir)&&!fs.existsSync(path.join(dir,'tsconfig.json'))){dir=path.dirname(dir)}if(fs.existsSync(path.join(dir,'tsconfig.json'))){try{const r=execSync('npx tsc --noEmit --pretty false 2>&1',{cwd:dir,encoding:'utf8',stdio:['pipe','pipe','pipe']});const lines=r.split('\\n').filter(l=>l.includes(p)).slice(0,10);if(lines.length)console.error(lines.join('\\n'))}catch(e){const lines=(e.stdout||'').split('\\n').filter(l=>l.includes(p)).slice(0,10);if(lines.length)console.error(lines.join('\\n'))}}}console.log(d)})\""
+            "command": "node -e \"const{execSync}=require('child_process');const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){try{const r=execSync('g++ -std=c++20 -Wall -Wextra -fsyntax-only \"'+p+'\" 2>&1',{encoding:'utf8',stdio:['pipe','pipe','pipe']});if(r.trim())console.error(r.trim())}catch(e){const out=(e.stdout||'')+(e.stderr||'');const lines=out.split('\\n').filter(l=>l.includes('error')||l.includes('warning')).slice(0,10);if(lines.length)console.error(lines.join('\\n'))}}console.log(d)})\""
           }
         ],
-        "description": "TypeScript check after editing .ts/.tsx files"
+        "description": "C++20 syntax check after editing .cpp/.cc/.cxx files"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx|js|jsx)$\"",
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|hpp|cc|h|cxx|hxx)$\"",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');const lines=c.split('\\n');const matches=[];lines.forEach((l,idx)=>{if(/console\\.log/.test(l))matches.push((idx+1)+': '+l.trim())});if(matches.length){console.error('[Hook] WARNING: console.log found in '+p);matches.slice(0,5).forEach(m=>console.error(m));console.error('[Hook] Remove console.log before committing')}}console.log(d)})\""
+            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');const lines=c.split('\\n');const matches=[];lines.forEach((l,idx)=>{if(/\\bstd::cout\\b|\\bprintf\\s*\\(|\\bfprintf\\s*\\(\\s*stderr/.test(l))matches.push((idx+1)+': '+l.trim())});if(matches.length){console.error('[Hook] WARNING: Debug output found in '+p);matches.slice(0,5).forEach(m=>console.error(m));console.error('[Hook] Remove std::cout/printf/fprintf(stderr before committing')}}console.log(d)})\""
           }
         ],
-        "description": "Warn about console.log statements after edits"
+        "description": "Warn about debug output statements (std::cout/printf/fprintf) after edits"
       }
     ],
     "Stop": [
@@ -140,7 +140,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-console-log.js\""
           }
         ],
-        "description": "Check for console.log in modified files after each response"
+        "description": "Check for debug output in modified C++ files after each response"
       }
     ],
     "SessionEnd": [

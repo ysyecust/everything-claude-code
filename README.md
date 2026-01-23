@@ -1,91 +1,16 @@
-**Language:** English | [繁體中文](docs/zh-TW/README.md)
+**Language:** English | [简体中文](README.zh-CN.md)
 
 # Everything Claude Code
 
 [![Stars](https://img.shields.io/github/stars/affaan-m/everything-claude-code?style=flat)](https://github.com/affaan-m/everything-claude-code/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Shell](https://img.shields.io/badge/-Shell-4EAA25?logo=gnu-bash&logoColor=white)
-![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white)
-![Go](https://img.shields.io/badge/-Go-00ADD8?logo=go&logoColor=white)
+![C++](https://img.shields.io/badge/-C%2B%2B20-00599C?logo=c%2B%2B&logoColor=white)
+![CMake](https://img.shields.io/badge/-CMake-064F8C?logo=cmake&logoColor=white)
 ![Markdown](https://img.shields.io/badge/-Markdown-000000?logo=markdown&logoColor=white)
 
-<p align="left">
-  <span>English</span> |
-  <a href="README.zh-CN.md">简体中文</a>
-</p>
+**The complete collection of Claude Code configs for C++20 HPC development.**
 
-**The complete collection of Claude Code configs from an Anthropic hackathon winner.**
-
-Production-ready agents, skills, hooks, commands, rules, and MCP configurations evolved over 10+ months of intensive daily use building real products.
-
----
-
-## The Guides
-
-This repo is the raw code only. The guides explain everything.
-
-<table>
-<tr>
-<td width="50%">
-<a href="https://x.com/affaanmustafa/status/2012378465664745795">
-<img src="https://github.com/user-attachments/assets/1a471488-59cc-425b-8345-5245c7efbcef" alt="The Shorthand Guide to Everything Claude Code" />
-</a>
-</td>
-<td width="50%">
-<a href="https://x.com/affaanmustafa/status/2014040193557471352">
-<img src="https://github.com/user-attachments/assets/c9ca43bc-b149-427f-b551-af6840c368f0" alt="The Longform Guide to Everything Claude Code" />
-</a>
-</td>
-</tr>
-<tr>
-<td align="center"><b>Shorthand Guide</b><br/>Setup, foundations, philosophy. <b>Read this first.</b></td>
-<td align="center"><b>Longform Guide</b><br/>Token optimization, memory persistence, evals, parallelization.</td>
-</tr>
-</table>
-
-| Topic | What You'll Learn |
-|-------|-------------------|
-| Token Optimization | Model selection, system prompt slimming, background processes |
-| Memory Persistence | Hooks that save/load context across sessions automatically |
-| Continuous Learning | Auto-extract patterns from sessions into reusable skills |
-| Verification Loops | Checkpoint vs continuous evals, grader types, pass@k metrics |
-| Parallelization | Git worktrees, cascade method, when to scale instances |
-| Subagent Orchestration | The context problem, iterative retrieval pattern |
-
----
-
-## Cross-Platform Support
-
-This plugin now fully supports **Windows, macOS, and Linux**. All hooks and scripts have been rewritten in Node.js for maximum compatibility.
-
-### Package Manager Detection
-
-The plugin automatically detects your preferred package manager (npm, pnpm, yarn, or bun) with the following priority:
-
-1. **Environment variable**: `CLAUDE_PACKAGE_MANAGER`
-2. **Project config**: `.claude/package-manager.json`
-3. **package.json**: `packageManager` field
-4. **Lock file**: Detection from package-lock.json, yarn.lock, pnpm-lock.yaml, or bun.lockb
-5. **Global config**: `~/.claude/package-manager.json`
-6. **Fallback**: First available package manager
-
-To set your preferred package manager:
-
-```bash
-# Via environment variable
-export CLAUDE_PACKAGE_MANAGER=pnpm
-
-# Via global config
-node scripts/setup-package-manager.js --global pnpm
-
-# Via project config
-node scripts/setup-package-manager.js --project bun
-
-# Detect current setting
-node scripts/setup-package-manager.js --detect
-```
-
-Or use the `/setup-pm` command in Claude Code.
+Production-ready agents, skills, hooks, commands, rules, and configurations for high-performance computing with modern C++, CMake, Google Test, sanitizers, and more.
 
 ---
 
@@ -97,99 +22,115 @@ This repo is a **Claude Code plugin** - install it directly or copy components m
 everything-claude-code/
 |-- .claude-plugin/   # Plugin and marketplace manifests
 |   |-- plugin.json         # Plugin metadata and component paths
-|   |-- marketplace.json    # Marketplace catalog for /plugin marketplace add
+|   |-- marketplace.json    # Marketplace catalog
 |
 |-- agents/           # Specialized subagents for delegation
-|   |-- planner.md           # Feature implementation planning
-|   |-- architect.md         # System design decisions
-|   |-- tdd-guide.md         # Test-driven development
-|   |-- code-reviewer.md     # Quality and security review
-|   |-- security-reviewer.md # Vulnerability analysis
-|   |-- build-error-resolver.md
-|   |-- e2e-runner.md        # Playwright E2E testing
-|   |-- refactor-cleaner.md  # Dead code cleanup
-|   |-- doc-updater.md       # Documentation sync
-|   |-- go-reviewer.md       # Go code review (NEW)
-|   |-- go-build-resolver.md # Go build error resolution (NEW)
+|   |-- planner.md               # Feature implementation planning
+|   |-- architect.md             # System design decisions
+|   |-- tdd-guide.md             # C++20 test-driven development
+|   |-- code-reviewer.md         # Memory safety and performance review
+|   |-- security-reviewer.md     # Sanitizer and vulnerability analysis
+|   |-- build-error-resolver.md  # CMake/linker/template error resolution
+|   |-- integration-test-runner.md  # CTest integration testing
+|   |-- refactor-cleaner.md      # Dead code cleanup
+|   |-- doc-updater.md           # Documentation sync
 |
 |-- skills/           # Workflow definitions and domain knowledge
-|   |-- coding-standards/           # Language best practices
-|   |-- backend-patterns/           # API, database, caching patterns
-|   |-- frontend-patterns/          # React, Next.js patterns
-|   |-- continuous-learning/        # Auto-extract patterns from sessions (Longform Guide)
+|   |-- coding-standards/           # C++20 naming, concepts, ranges
+|   |-- hpc-patterns/              # Cache-friendly, SIMD, threading, NUMA
+|   |-- numerical-patterns/         # Sparse matrices, solvers, HPC I/O
+|   |-- continuous-learning/        # Auto-extract patterns from sessions
 |   |-- continuous-learning-v2/     # Instinct-based learning with confidence scoring
 |   |-- iterative-retrieval/        # Progressive context refinement for subagents
-|   |-- strategic-compact/          # Manual compaction suggestions (Longform Guide)
-|   |-- tdd-workflow/               # TDD methodology
+|   |-- strategic-compact/          # Manual compaction suggestions
+|   |-- tdd-workflow/               # Google Test/Mock TDD methodology
 |   |-- security-review/            # Security checklist
-|   |-- eval-harness/               # Verification loop evaluation (Longform Guide)
-|   |-- verification-loop/          # Continuous verification (Longform Guide)
-|   |-- golang-patterns/            # Go idioms and best practices (NEW)
-|   |-- golang-testing/             # Go testing patterns, TDD, benchmarks (NEW)
+|   |-- eval-harness/               # Verification loop evaluation
+|   |-- verification-loop/          # Continuous verification
 |
 |-- commands/         # Slash commands for quick execution
-|   |-- tdd.md              # /tdd - Test-driven development
-|   |-- plan.md             # /plan - Implementation planning
-|   |-- e2e.md              # /e2e - E2E test generation
-|   |-- code-review.md      # /code-review - Quality review
-|   |-- build-fix.md        # /build-fix - Fix build errors
-|   |-- refactor-clean.md   # /refactor-clean - Dead code removal
-|   |-- learn.md            # /learn - Extract patterns mid-session (Longform Guide)
-|   |-- checkpoint.md       # /checkpoint - Save verification state (Longform Guide)
-|   |-- verify.md           # /verify - Run verification loop (Longform Guide)
-|   |-- setup-pm.md         # /setup-pm - Configure package manager
-|   |-- go-review.md        # /go-review - Go code review (NEW)
-|   |-- go-test.md          # /go-test - Go TDD workflow (NEW)
-|   |-- go-build.md         # /go-build - Fix Go build errors (NEW)
-|   |-- skill-create.md     # /skill-create - Generate skills from git history (NEW)
-|   |-- instinct-status.md  # /instinct-status - View learned instincts (NEW)
-|   |-- instinct-import.md  # /instinct-import - Import instincts (NEW)
-|   |-- instinct-export.md  # /instinct-export - Export instincts (NEW)
-|   |-- evolve.md           # /evolve - Cluster instincts into skills (NEW)
+|   |-- tdd.md                # /tdd - C++20 test-driven development
+|   |-- plan.md               # /plan - Implementation planning
+|   |-- integration-test.md   # /integration-test - CTest integration tests
+|   |-- code-review.md        # /code-review - Quality review
+|   |-- build-fix.md          # /build-fix - Fix CMake build errors
+|   |-- test-coverage.md      # /test-coverage - gcov/lcov coverage
+|   |-- refactor-clean.md     # /refactor-clean - Dead code removal
+|   |-- learn.md              # /learn - Extract patterns mid-session
+|   |-- checkpoint.md         # /checkpoint - Save verification state
+|   |-- verify.md             # /verify - Run verification loop
+|   |-- setup-pm.md           # /setup-pm - Configure build system
+|   |-- skill-create.md       # /skill-create - Generate skills from git history
+|   |-- instinct-status.md    # /instinct-status - View learned instincts
+|   |-- instinct-import.md    # /instinct-import - Import instincts
+|   |-- instinct-export.md    # /instinct-export - Export instincts
+|   |-- evolve.md             # /evolve - Cluster instincts into skills
 |
-|-- rules/            # Always-follow guidelines (copy to ~/.claude/rules/)
-|   |-- security.md         # Mandatory security checks
-|   |-- coding-style.md     # Immutability, file organization
-|   |-- testing.md          # TDD, 80% coverage requirement
+|-- rules/            # Always-follow guidelines
+|   |-- security.md         # Buffer overflow, use-after-free, sanitizers
+|   |-- coding-style.md     # RAII, const correctness, C++20 features
+|   |-- testing.md          # Google Test, 80% coverage requirement
 |   |-- git-workflow.md     # Commit format, PR process
 |   |-- agents.md           # When to delegate to subagents
 |   |-- performance.md      # Model selection, context management
+|   |-- patterns.md         # Result type, CRTP, Builder pattern
 |
 |-- hooks/            # Trigger-based automations
-|   |-- hooks.json                # All hooks config (PreToolUse, PostToolUse, Stop, etc.)
-|   |-- memory-persistence/       # Session lifecycle hooks (Longform Guide)
-|   |-- strategic-compact/        # Compaction suggestions (Longform Guide)
+|   |-- hooks.json                # clang-format, syntax check, debug detection
+|   |-- memory-persistence/       # Session lifecycle hooks
+|   |-- strategic-compact/        # Compaction suggestions
 |
-|-- scripts/          # Cross-platform Node.js scripts (NEW)
+|-- scripts/          # Cross-platform Node.js scripts
 |   |-- lib/                     # Shared utilities
 |   |   |-- utils.js             # Cross-platform file/path/system utilities
-|   |   |-- package-manager.js   # Package manager detection and selection
+|   |   |-- build-system.js      # CMake/Make detection and compiler selection
 |   |-- hooks/                   # Hook implementations
 |   |   |-- session-start.js     # Load context on session start
 |   |   |-- session-end.js       # Save state on session end
 |   |   |-- pre-compact.js       # Pre-compaction state saving
 |   |   |-- suggest-compact.js   # Strategic compaction suggestions
 |   |   |-- evaluate-session.js  # Extract patterns from sessions
-|   |-- setup-package-manager.js # Interactive PM setup
+|   |-- setup-build-system.js    # Interactive build system setup
 |
-|-- tests/            # Test suite (NEW)
+|-- tests/            # Test suite
 |   |-- lib/                     # Library tests
 |   |-- hooks/                   # Hook tests
+|   |-- integration/             # Integration tests
 |   |-- run-all.js               # Run all tests
 |
-|-- contexts/         # Dynamic system prompt injection contexts (Longform Guide)
+|-- contexts/         # Dynamic system prompt injection contexts
 |   |-- dev.md              # Development mode context
 |   |-- review.md           # Code review mode context
 |   |-- research.md         # Research/exploration mode context
-|
-|-- examples/         # Example configurations and sessions
-|   |-- CLAUDE.md           # Example project-level config
-|   |-- user-CLAUDE.md      # Example user-level config
-|
-|-- mcp-configs/      # MCP server configurations
-|   |-- mcp-servers.json    # GitHub, Supabase, Vercel, Railway, etc.
-|
-|-- marketplace.json  # Self-hosted marketplace config (for /plugin marketplace add)
+```
+
+---
+
+## Build System Detection
+
+The plugin automatically detects your preferred build system (CMake/Make) and compiler (GCC/Clang) with the following priority:
+
+1. **Environment variable**: `CLAUDE_BUILD_SYSTEM` / `CLAUDE_CXX_COMPILER`
+2. **Project config**: `.claude/build-system.json`
+3. **Project files**: CMakeLists.txt or Makefile detection
+4. **Global config**: `~/.claude/build-system.json`
+5. **Fallback**: First available (cmake > make, clang > gcc)
+
+To set your preferred build system:
+
+```bash
+# Via environment variable
+export CLAUDE_BUILD_SYSTEM=cmake
+export CLAUDE_CXX_COMPILER=clang++
+
+# Via setup script
+node scripts/setup-build-system.js --global cmake
+
+# Detect current setting
+node scripts/setup-build-system.js --detect
+
+# List available options
+node scripts/setup-build-system.js --list
 ```
 
 ---
@@ -259,7 +200,7 @@ claude --version
 
 ### Important: Hooks Auto-Loading Behavior
 
-> ⚠️ **For Contributors:** Do NOT add a `"hooks"` field to `.claude-plugin/plugin.json`. This is enforced by a regression test.
+> **For Contributors:** Do NOT add a `"hooks"` field to `.claude-plugin/plugin.json`. This is enforced by a regression test.
 
 Claude Code v2.1+ **automatically loads** `hooks/hooks.json` from any installed plugin by convention. Explicitly declaring it in `plugin.json` causes a duplicate detection error:
 
@@ -267,15 +208,11 @@ Claude Code v2.1+ **automatically loads** `hooks/hooks.json` from any installed 
 Duplicate hooks file detected: ./hooks/hooks.json resolves to already-loaded file
 ```
 
-**History:** This has caused repeated fix/revert cycles in this repo ([#29](https://github.com/affaan-m/everything-claude-code/issues/29), [#52](https://github.com/affaan-m/everything-claude-code/issues/52), [#103](https://github.com/affaan-m/everything-claude-code/issues/103)). The behavior changed between Claude Code versions, leading to confusion. We now have a regression test to prevent this from being reintroduced.
-
 ---
 
 ## Installation
 
 ### Option 1: Install as Plugin (Recommended)
-
-The easiest way to use this repo - install as a Claude Code plugin:
 
 ```bash
 # Add this repo as a marketplace
@@ -323,8 +260,6 @@ This gives you instant access to all commands, agents, skills, and hooks.
 
 ### Option 2: Manual Installation
 
-If you prefer manual control over what's installed:
-
 ```bash
 # Clone the repo
 git clone https://github.com/affaan-m/everything-claude-code.git
@@ -346,75 +281,55 @@ cp -r everything-claude-code/skills/* ~/.claude/skills/
 
 Copy the hooks from `hooks/hooks.json` to your `~/.claude/settings.json`.
 
-#### Configure MCPs
-
-Copy desired MCP servers from `mcp-configs/mcp-servers.json` to your `~/.claude.json`.
-
-**Important:** Replace `YOUR_*_HERE` placeholders with your actual API keys.
-
 ---
 
 ## Key Concepts
 
 ### Agents
 
-Subagents handle delegated tasks with limited scope. Example:
+Subagents handle delegated tasks with limited scope:
 
-```markdown
----
-name: code-reviewer
-description: Reviews code for quality, security, and maintainability
-tools: ["Read", "Grep", "Glob", "Bash"]
-model: opus
----
-
-You are a senior code reviewer...
-```
+- **tdd-guide** - C++20 TDD with Google Test/Mock
+- **build-error-resolver** - CMake, linker, template errors
+- **code-reviewer** - Memory safety, RAII, performance
+- **security-reviewer** - ASan/UBSan/TSan/MSan analysis
+- **integration-test-runner** - CTest labels, MPI tests
 
 ### Skills
 
-Skills are workflow definitions invoked by commands or agents:
+Domain knowledge for C++20 HPC:
 
-```markdown
-# TDD Workflow
-
-1. Define interfaces first
-2. Write failing tests (RED)
-3. Implement minimal code (GREEN)
-4. Refactor (IMPROVE)
-5. Verify 80%+ coverage
-```
+- **coding-standards** - Naming, concepts, ranges, constexpr
+- **hpc-patterns** - Cache-friendly data, SIMD, threading, NUMA
+- **numerical-patterns** - Sparse matrices, CG/GMRES, HPC I/O
+- **tdd-workflow** - Google Test parameterized tests, CMake integration
 
 ### Hooks
 
-Hooks fire on tool events. Example - warn about console.log:
+Hooks fire on tool events:
 
 ```json
 {
-  "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx|js|jsx)$\"",
+  "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|hpp|cc|h)$\"",
   "hooks": [{
     "type": "command",
-    "command": "#!/bin/bash\ngrep -n 'console\\.log' \"$file_path\" && echo '[Hook] Remove console.log' >&2"
+    "command": "clang-format --style=Google -i \"$file_path\""
   }]
 }
 ```
 
 ### Rules
 
-Rules are always-follow guidelines. Keep them modular:
+Always-follow guidelines for C++20:
 
-```
-~/.claude/rules/
-  security.md      # No hardcoded secrets
-  coding-style.md  # Immutability, file limits
-  testing.md       # TDD, coverage requirements
-```
+- **security.md** - Buffer overflow, use-after-free, CWE Top 25
+- **coding-style.md** - RAII, const correctness, move semantics
+- **testing.md** - Google Test, 80% coverage, TDD workflow
+- **patterns.md** - Result type, CRTP, Builder pattern
 
 ---
 
 ## Running Tests
-
-The plugin includes a comprehensive test suite:
 
 ```bash
 # Run all tests
@@ -422,9 +337,39 @@ node tests/run-all.js
 
 # Run individual test files
 node tests/lib/utils.test.js
-node tests/lib/package-manager.test.js
+node tests/lib/build-system.test.js
 node tests/hooks/hooks.test.js
+
+# Run CI validation scripts
+node scripts/ci/validate-agents.js
+node scripts/ci/validate-commands.js
+node scripts/ci/validate-hooks.js
+node scripts/ci/validate-rules.js
+node scripts/ci/validate-skills.js
 ```
+
+---
+
+## C++20 Features Covered
+
+- **Concepts** - Type constraints and requirements
+- **Ranges** - Composable algorithms and views
+- **std::span** - Non-owning contiguous views
+- **std::expected** - Error handling without exceptions
+- **constexpr/consteval** - Compile-time computation
+- **Structured bindings** - Decomposition declarations
+- **Three-way comparison** - Spaceship operator
+
+---
+
+## HPC Patterns
+
+- Cache-friendly data structures (SoA/AoS)
+- SIMD vectorization hints
+- Thread pool and lock-free containers
+- NUMA-aware memory allocation
+- MPI communication patterns
+- HDF5 and binary I/O
 
 ---
 
@@ -432,29 +377,15 @@ node tests/hooks/hooks.test.js
 
 **Contributions are welcome and encouraged.**
 
-This repo is meant to be a community resource. If you have:
-- Useful agents or skills
-- Clever hooks
-- Better MCP configurations
-- Improved rules
-
-Please contribute! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ### Ideas for Contributions
 
-- Language-specific skills (Python, Rust patterns) - Go now included!
-- Framework-specific configs (Django, Rails, Laravel)
-- DevOps agents (Kubernetes, Terraform, AWS)
-- Testing strategies (different frameworks)
-- Domain-specific knowledge (ML, data engineering, mobile)
-
----
-
-## Background
-
-I've been using Claude Code since the experimental rollout. Won the Anthropic x Forum Ventures hackathon in Sep 2025 building [zenith.chat](https://zenith.chat) with [@DRodriguezFX](https://x.com/DRodriguezFX) - entirely using Claude Code.
-
-These configs are battle-tested across multiple production applications.
+- Additional HPC patterns (GPU offload, heterogeneous computing)
+- New solver algorithms (multigrid, domain decomposition)
+- Build system integrations (Ninja, Meson)
+- Profiling agents (perf, vtune, gprof)
+- Additional sanitizer workflows
 
 ---
 
@@ -469,13 +400,11 @@ Rule of thumb:
 - Keep under 10 enabled per project
 - Under 80 tools active
 
-Use `disabledMcpServers` in project config to disable unused ones.
-
 ### Customization
 
-These configs work for my workflow. You should:
+These configs work for C++20 HPC workflows. You should:
 1. Start with what resonates
-2. Modify for your stack
+2. Modify for your specific HPC stack
 3. Remove what you don't use
 4. Add your own patterns
 
@@ -487,19 +416,6 @@ These configs work for my workflow. You should:
 
 ---
 
-## Links
-
-- **Shorthand Guide (Start Here):** [The Shorthand Guide to Everything Claude Code](https://x.com/affaanmustafa/status/2012378465664745795)
-- **Longform Guide (Advanced):** [The Longform Guide to Everything Claude Code](https://x.com/affaanmustafa/status/2014040193557471352)
-- **Follow:** [@affaanmustafa](https://x.com/affaanmustafa)
-- **zenith.chat:** [zenith.chat](https://zenith.chat)
-
----
-
 ## License
 
 MIT - Use freely, modify as needed, contribute back if you can.
-
----
-
-**Star this repo if it helps. Read both guides. Build something great.**

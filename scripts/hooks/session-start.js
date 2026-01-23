@@ -15,7 +15,7 @@ const {
   ensureDir,
   log
 } = require('../lib/utils');
-const { getPackageManager, getSelectionPrompt } = require('../lib/package-manager');
+const { getBuildSystem, getCompiler, getSelectionPrompt } = require('../lib/build-system');
 
 async function main() {
   const sessionsDir = getSessionsDir();
@@ -42,13 +42,15 @@ async function main() {
     log(`[SessionStart] ${learnedSkills.length} learned skill(s) available in ${learnedDir}`);
   }
 
-  // Detect and report package manager
-  const pm = getPackageManager();
-  log(`[SessionStart] Package manager: ${pm.name} (${pm.source})`);
+  // Detect and report build system
+  const bs = getBuildSystem();
+  const comp = getCompiler();
+  log(`[SessionStart] Build system: ${bs.name} (${bs.source})`);
+  log(`[SessionStart] Compiler: ${comp.config.cxx} (${comp.source})`);
 
-  // If package manager was detected via fallback, show selection prompt
-  if (pm.source === 'fallback' || pm.source === 'default') {
-    log('[SessionStart] No package manager preference found.');
+  // If build system was detected via fallback, show selection prompt
+  if (bs.source === 'fallback' || bs.source === 'default') {
+    log('[SessionStart] No build system preference found.');
     log(getSelectionPrompt());
   }
 

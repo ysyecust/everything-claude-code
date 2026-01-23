@@ -340,6 +340,6 @@ SUPABASE_KEY=eyJ...
 ## Related Skills
 
 - `coding-standards.md` - General coding best practices
-- `backend-patterns.md` - API and database patterns
-- `frontend-patterns.md` - React and Next.js patterns
+- `hpc-patterns/` - Cache-friendly structures, SIMD, threading, NUMA
+- `numerical-patterns/` - Sparse matrices, solvers, HPC I/O
 - `tdd-workflow/` - Test-driven development methodology
