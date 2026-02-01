@@ -3,14 +3,14 @@
 # Everything Claude Code
 
 [![Stars](https://img.shields.io/github/stars/affaan-m/everything-claude-code?style=flat)](https://github.com/affaan-m/everything-claude-code/stargazers)
+[![CI](https://img.shields.io/github/actions/workflow/status/ysyecust/everything-claude-code/ci.yml?label=CI)](https://github.com/ysyecust/everything-claude-code/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![C++](https://img.shields.io/badge/-C%2B%2B20-00599C?logo=c%2B%2B&logoColor=white)
 ![CMake](https://img.shields.io/badge/-CMake-064F8C?logo=cmake&logoColor=white)
-![Markdown](https://img.shields.io/badge/-Markdown-000000?logo=markdown&logoColor=white)
 
 **The complete collection of Claude Code configs for C++20 HPC development.**
 
-Production-ready agents, skills, hooks, commands, rules, and configurations for high-performance computing with modern C++, CMake, Google Test, sanitizers, and more.
+Production-ready agents, skills, hooks, commands, rules, and configurations for high-performance computing with modern C++, CMake, Google Test, sanitizers, and more. Forked from [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) and adapted for C++20 HPC workflows.
 
 ---
 
@@ -24,6 +24,11 @@ everything-claude-code/
 |   |-- plugin.json         # Plugin metadata and component paths
 |   |-- marketplace.json    # Marketplace catalog
 |
+|-- .github/workflows/ # CI/CD pipelines
+|   |-- ci.yml              # Main CI (validate + test)
+|   |-- reusable-validate.yml  # Reusable validation job
+|   |-- reusable-test.yml      # Reusable test job
+|
 |-- agents/           # Specialized subagents for delegation
 |   |-- planner.md               # Feature implementation planning
 |   |-- architect.md             # System design decisions
@@ -34,19 +39,34 @@ everything-claude-code/
 |   |-- integration-test-runner.md  # CTest integration testing
 |   |-- refactor-cleaner.md      # Dead code cleanup
 |   |-- doc-updater.md           # Documentation sync
+|   |-- database-reviewer.md     # SQL/database review
+|   |-- go-reviewer.md           # Go code review
+|   |-- go-build-resolver.md     # Go build error resolution
 |
 |-- skills/           # Workflow definitions and domain knowledge
+|   |                             # --- C++20 HPC ---
 |   |-- coding-standards/           # C++20 naming, concepts, ranges
 |   |-- hpc-patterns/              # Cache-friendly, SIMD, threading, NUMA
 |   |-- numerical-patterns/         # Sparse matrices, solvers, HPC I/O
+|   |-- tdd-workflow/               # Google Test/Mock TDD methodology
+|   |                             # --- Cross-language ---
 |   |-- continuous-learning/        # Auto-extract patterns from sessions
 |   |-- continuous-learning-v2/     # Instinct-based learning with confidence scoring
 |   |-- iterative-retrieval/        # Progressive context refinement for subagents
 |   |-- strategic-compact/          # Manual compaction suggestions
-|   |-- tdd-workflow/               # Google Test/Mock TDD methodology
-|   |-- security-review/            # Security checklist
+|   |-- security-review/            # Security checklist + cloud infrastructure
 |   |-- eval-harness/               # Verification loop evaluation
 |   |-- verification-loop/          # Continuous verification
+|   |                             # --- Multi-language (from upstream) ---
+|   |-- golang-patterns/           # Go idioms and best practices
+|   |-- golang-testing/            # Go table-driven tests, benchmarks
+|   |-- springboot-patterns/       # Spring Boot architecture
+|   |-- springboot-tdd/            # Spring Boot TDD with JUnit 5
+|   |-- springboot-security/       # Spring Security best practices
+|   |-- java-coding-standards/     # Java coding conventions
+|   |-- jpa-patterns/              # JPA/Hibernate patterns
+|   |-- postgres-patterns/         # PostgreSQL optimization
+|   |-- clickhouse-io/             # ClickHouse analytics patterns
 |
 |-- commands/         # Slash commands for quick execution
 |   |-- tdd.md                # /tdd - C++20 test-driven development
@@ -65,6 +85,8 @@ everything-claude-code/
 |   |-- instinct-import.md    # /instinct-import - Import instincts
 |   |-- instinct-export.md    # /instinct-export - Export instincts
 |   |-- evolve.md             # /evolve - Cluster instincts into skills
+|   |-- orchestrate.md        # /orchestrate - Multi-agent task orchestration
+|   |-- eval.md               # /eval - Run evaluation harness
 |
 |-- rules/            # Always-follow guidelines
 |   |-- security.md         # Buffer overflow, use-after-free, sanitizers
@@ -80,6 +102,10 @@ everything-claude-code/
 |   |-- memory-persistence/       # Session lifecycle hooks
 |   |-- strategic-compact/        # Compaction suggestions
 |
+|-- schemas/          # JSON validation schemas
+|   |-- hooks.schema.json         # hooks.json format validation
+|   |-- plugin.schema.json        # plugin.json format validation
+|
 |-- scripts/          # Cross-platform Node.js scripts
 |   |-- lib/                     # Shared utilities
 |   |   |-- utils.js             # Cross-platform file/path/system utilities
@@ -90,6 +116,13 @@ everything-claude-code/
 |   |   |-- pre-compact.js       # Pre-compaction state saving
 |   |   |-- suggest-compact.js   # Strategic compaction suggestions
 |   |   |-- evaluate-session.js  # Extract patterns from sessions
+|   |   |-- check-console-log.js # Detect C++ debug output (std::cout/printf)
+|   |-- ci/                      # CI validation scripts
+|   |   |-- validate-agents.js   # Validate agent frontmatter
+|   |   |-- validate-commands.js # Validate command frontmatter
+|   |   |-- validate-hooks.js    # Validate hooks.json format
+|   |   |-- validate-rules.js    # Validate rules format
+|   |   |-- validate-skills.js   # Validate skills format
 |   |-- setup-build-system.js    # Interactive build system setup
 |
 |-- tests/            # Test suite
@@ -102,6 +135,9 @@ everything-claude-code/
 |   |-- dev.md              # Development mode context
 |   |-- review.md           # Code review mode context
 |   |-- research.md         # Research/exploration mode context
+|
+|-- the-shortform-guide.md  # Quick-start guide (C++20 HPC)
+|-- the-longform-guide.md   # Comprehensive deep-dive guide (C++20 HPC)
 ```
 
 ---
@@ -289,20 +325,47 @@ Copy the hooks from `hooks/hooks.json` to your `~/.claude/settings.json`.
 
 Subagents handle delegated tasks with limited scope:
 
+**C++20 HPC:**
+
 - **tdd-guide** - C++20 TDD with Google Test/Mock
 - **build-error-resolver** - CMake, linker, template errors
 - **code-reviewer** - Memory safety, RAII, performance
 - **security-reviewer** - ASan/UBSan/TSan/MSan analysis
 - **integration-test-runner** - CTest labels, MPI tests
 
+**General:**
+
+- **planner** - Feature implementation planning
+- **architect** - System design decisions
+- **refactor-cleaner** - Dead code cleanup
+- **doc-updater** - Documentation sync
+- **database-reviewer** - SQL/database review
+- **go-reviewer** / **go-build-resolver** - Go code review and build fixes
+
 ### Skills
 
-Domain knowledge for C++20 HPC:
+**C++20 HPC domain knowledge:**
 
 - **coding-standards** - Naming, concepts, ranges, constexpr
 - **hpc-patterns** - Cache-friendly data, SIMD, threading, NUMA
 - **numerical-patterns** - Sparse matrices, CG/GMRES, HPC I/O
 - **tdd-workflow** - Google Test parameterized tests, CMake integration
+
+**Cross-language (learning & workflow):**
+
+- **continuous-learning-v2** - Instinct-based learning with confidence scoring
+- **iterative-retrieval** - Progressive context refinement for subagents
+- **strategic-compact** - Manual compaction suggestions
+- **eval-harness** - Verification loop evaluation
+- **security-review** - Security checklist + cloud infrastructure
+
+**Multi-language (from upstream):**
+
+- **golang-patterns** / **golang-testing** - Go idioms and testing
+- **springboot-patterns** / **springboot-tdd** / **springboot-security** - Spring Boot
+- **jpa-patterns** / **java-coding-standards** - Java/JPA
+- **postgres-patterns** - PostgreSQL optimization
+- **clickhouse-io** - ClickHouse analytics
 
 ### Hooks
 
@@ -326,6 +389,13 @@ Always-follow guidelines for C++20:
 - **coding-style.md** - RAII, const correctness, move semantics
 - **testing.md** - Google Test, 80% coverage, TDD workflow
 - **patterns.md** - Result type, CRTP, Builder pattern
+
+---
+
+## Guides
+
+- **[Quick-start Guide](the-shortform-guide.md)** - Get productive fast with C++20 HPC patterns
+- **[Comprehensive Guide](the-longform-guide.md)** - Deep dive into every component and workflow
 
 ---
 
@@ -410,7 +480,9 @@ These configs work for C++20 HPC workflows. You should:
 
 ---
 
-## Star History
+## Upstream
+
+This is a C++20 HPC-adapted fork of [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code). We periodically sync with upstream and adapt new components for HPC workflows.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=affaan-m/everything-claude-code&type=Date)](https://star-history.com/#affaan-m/everything-claude-code&Date)
 

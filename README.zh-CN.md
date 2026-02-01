@@ -1,13 +1,16 @@
+**语言:** [English](README.md) | 简体中文
+
 # Everything Claude Code
 
 [![Stars](https://img.shields.io/github/stars/affaan-m/everything-claude-code?style=flat)](https://github.com/affaan-m/everything-claude-code/stargazers)
+[![CI](https://img.shields.io/github/actions/workflow/status/ysyecust/everything-claude-code/ci.yml?label=CI)](https://github.com/ysyecust/everything-claude-code/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![C++](https://img.shields.io/badge/-C%2B%2B20-00599C?logo=c%2B%2B&logoColor=white)
 ![CMake](https://img.shields.io/badge/-CMake-064F8C?logo=cmake&logoColor=white)
 
 **面向 C++20 高性能计算开发的 Claude Code 完整配置集合。**
 
-生产就绪的 agents、skills、hooks、commands、rules 和配置，覆盖现代 C++、CMake、Google Test、sanitizers 等方方面面。
+生产就绪的 agents、skills、hooks、commands、rules 和配置，覆盖现代 C++、CMake、Google Test、sanitizers 等方方面面。Fork 自 [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)，并适配 C++20 HPC 工作流。
 
 ---
 
@@ -17,16 +20,39 @@
 
 ```
 everything-claude-code/
-|-- .claude-plugin/   # 插件和市场清单
-|-- agents/           # 专业子代理（planner, tdd-guide, code-reviewer 等）
-|-- skills/           # 工作流定义和领域知识（C++20 编码标准, HPC 模式等）
-|-- commands/         # 斜杠命令（/tdd, /plan, /code-review 等）
-|-- rules/            # 始终遵循的准则（安全, 编码风格, 测试等）
-|-- hooks/            # 基于触发器的自动化（clang-format, 语法检查等）
-|-- scripts/          # 跨平台 Node.js 脚本
-|-- tests/            # 测试套件
-|-- contexts/         # 动态系统提示上下文
+|-- .claude-plugin/    # 插件和市场清单
+|-- .github/workflows/ # CI/CD 流水线
+|-- agents/            # 专业子代理（12 个）
+|   |-- C++20 HPC: tdd-guide, code-reviewer, security-reviewer,
+|   |     build-error-resolver, integration-test-runner
+|   |-- 通用: planner, architect, refactor-cleaner, doc-updater
+|   |-- 多语言: database-reviewer, go-reviewer, go-build-resolver
+|
+|-- skills/            # 工作流定义和领域知识（22 个）
+|   |-- C++20 HPC: coding-standards, hpc-patterns, numerical-patterns, tdd-workflow
+|   |-- 跨语言: continuous-learning-v2, iterative-retrieval, strategic-compact,
+|   |     security-review, eval-harness, verification-loop
+|   |-- 多语言: golang-*, springboot-*, java-*, jpa-*, postgres-*, clickhouse-io
+|
+|-- commands/          # 斜杠命令（23 个）
+|   |-- C++20: /tdd, /plan, /integration-test, /code-review, /build-fix, /test-coverage
+|   |-- 学习: /learn, /skill-create, /instinct-status, /instinct-import, /instinct-export, /evolve
+|   |-- 工作流: /orchestrate, /verify, /checkpoint, /eval, /setup-pm, /refactor-clean
+|
+|-- rules/             # 始终遵循的准则（7 个）
+|-- hooks/             # 基于触发器的自动化（clang-format, 语法检查, debug 检测等）
+|-- schemas/           # JSON 校验 schema（hooks, plugin）
+|-- scripts/           # 跨平台 Node.js 脚本（lib, hooks, ci）
+|-- tests/             # 测试套件（lib, hooks, integration）
+|-- contexts/          # 动态系统提示上下文（dev, review, research）
 ```
+
+---
+
+## 指南
+
+- **[快速上手指南](the-shortform-guide.md)** — 快速掌握 C++20 HPC 模式
+- **[完整深入指南](the-longform-guide.md)** — 每个组件和工作流的详细说明
 
 ---
 
@@ -51,34 +77,109 @@ node scripts/setup-build-system.js --global cmake
 
 ---
 
+## 生态工具
+
+### Skill Creator
+
+两种方式从仓库生成 Claude Code skill：
+
+**方式 A：本地分析（内置）**
+
+```bash
+/skill-create                    # 分析当前仓库
+/skill-create --instincts        # 同时生成 instincts
+```
+
+**方式 B：GitHub App（高级）**
+
+适用于 10k+ commit、自动 PR、团队共享：[安装 GitHub App](https://github.com/apps/skill-creator)
+
+### Continuous Learning v2
+
+基于 instinct 的自学习系统，自动学习你的编码模式：
+
+```bash
+/instinct-status        # 查看已学习的 instincts 和置信度
+/instinct-import <file> # 从他人导入 instincts
+/instinct-export        # 导出 instincts 用于分享
+/evolve                 # 将相关 instincts 聚类为 skills
+```
+
+详见 `skills/continuous-learning-v2/`。
+
+---
+
+## 系统要求
+
+### Claude Code CLI 版本
+
+**最低版本: v2.1.0 或更高**
+
+本插件要求 Claude Code CLI v2.1.0+，因为插件系统对 hooks 的处理方式有所变化。
+
+```bash
+claude --version
+```
+
+### 重要：Hooks 自动加载行为
+
+> **贡献者注意：** 不要在 `.claude-plugin/plugin.json` 中添加 `"hooks"` 字段。这一点由回归测试强制执行。
+
+Claude Code v2.1+ 会**自动加载**已安装插件中的 `hooks/hooks.json`。显式声明会导致重复检测错误。
+
+---
+
 ## 安装
 
 ### 方式一：作为插件安装（推荐）
 
 ```bash
 # 添加此仓库为市场
-/plugin marketplace add affaan-m/everything-claude-code
+/plugin marketplace add ysyecust/everything-claude-code
 
 # 安装插件
 /plugin install everything-claude-code@everything-claude-code
 ```
 
+或直接添加到 `~/.claude/settings.json`：
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "everything-claude-code": {
+      "source": {
+        "source": "github",
+        "repo": "ysyecust/everything-claude-code"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "everything-claude-code@everything-claude-code": true
+  }
+}
+```
+
+> **注意：** Claude Code 插件系统不支持通过插件分发 `rules`。需手动安装：
+>
+> ```bash
+> git clone https://github.com/ysyecust/everything-claude-code.git
+>
+> # 用户级规则（应用于所有项目）
+> cp -r everything-claude-code/rules/* ~/.claude/rules/
+>
+> # 项目级规则（仅应用于当前项目）
+> mkdir -p .claude/rules
+> cp -r everything-claude-code/rules/* .claude/rules/
+> ```
+
 ### 方式二：手动安装
 
 ```bash
-# 克隆仓库
-git clone https://github.com/affaan-m/everything-claude-code.git
+git clone https://github.com/ysyecust/everything-claude-code.git
 
-# 复制 agents
 cp everything-claude-code/agents/*.md ~/.claude/agents/
-
-# 复制 rules
 cp everything-claude-code/rules/*.md ~/.claude/rules/
-
-# 复制 commands
 cp everything-claude-code/commands/*.md ~/.claude/commands/
-
-# 复制 skills
 cp -r everything-claude-code/skills/* ~/.claude/skills/
 ```
 
@@ -88,7 +189,7 @@ cp -r everything-claude-code/skills/* ~/.claude/skills/
 
 ### Agents（子代理）
 
-子代理处理有限范围的委托任务：
+**C++20 HPC 专用：**
 
 | Agent | 功能 |
 |-------|------|
@@ -98,15 +199,41 @@ cp -r everything-claude-code/skills/* ~/.claude/skills/
 | **security-reviewer** | ASan/UBSan/TSan/MSan 分析 |
 | **integration-test-runner** | CTest 标签、MPI 测试 |
 
+**通用：**
+
+| Agent | 功能 |
+|-------|------|
+| **planner** | 功能实现规划 |
+| **architect** | 系统设计决策 |
+| **refactor-cleaner** | 死代码清理 |
+| **doc-updater** | 文档同步 |
+| **database-reviewer** | SQL/数据库审查 |
+| **go-reviewer** / **go-build-resolver** | Go 代码审查和构建修复 |
+
 ### Skills（技能）
 
-C++20 HPC 领域知识：
+**C++20 HPC 领域知识：**
 
 - **coding-standards** — 命名、concepts、ranges、constexpr
 - **hpc-patterns** — 缓存友好数据、SIMD、线程、NUMA
 - **numerical-patterns** — 稀疏矩阵、CG/GMRES、HPC I/O
 - **tdd-workflow** — Google Test 参数化测试、CMake 集成
+
+**跨语言（学习与工作流）：**
+
 - **continuous-learning-v2** — 基于 instinct 的自学习系统
+- **iterative-retrieval** — 子代理渐进式上下文检索
+- **strategic-compact** — 手动压缩建议
+- **eval-harness** — 验证循环评估
+- **security-review** — 安全检查清单 + 云基础设施安全
+
+**多语言（来自上游）：**
+
+- **golang-patterns** / **golang-testing** — Go 惯用模式和测试
+- **springboot-patterns** / **springboot-tdd** / **springboot-security** — Spring Boot
+- **jpa-patterns** / **java-coding-standards** — Java/JPA
+- **postgres-patterns** — PostgreSQL 优化
+- **clickhouse-io** — ClickHouse 分析
 
 ### Hooks（钩子）
 
@@ -138,6 +265,11 @@ C++20 始终遵循的准则：
 ```bash
 # 运行所有测试
 node tests/run-all.js
+
+# 运行单个测试
+node tests/lib/utils.test.js
+node tests/lib/build-system.test.js
+node tests/hooks/hooks.test.js
 
 # 运行 CI 校验脚本
 node scripts/ci/validate-agents.js
@@ -198,6 +330,14 @@ node scripts/ci/validate-skills.js
 - 配置 20-30 个 MCP
 - 每个项目启用不超过 10 个
 - 活跃工具不超过 80 个
+
+---
+
+## 上游
+
+本仓库是 [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) 的 C++20 HPC 适配 fork。我们定期与上游同步并适配新组件。
+
+[![Star History Chart](https://api.star-history.com/svg?repos=affaan-m/everything-claude-code&type=Date)](https://star-history.com/#affaan-m/everything-claude-code&Date)
 
 ---
 
