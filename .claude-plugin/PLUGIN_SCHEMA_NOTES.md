@@ -120,7 +120,7 @@ Assume the validator is hostile and literal.
 
 ## The `hooks` Field: DO NOT ADD
 
-> ⚠️ **CRITICAL:** Do NOT add a `"hooks"` field to `plugin.json`. This is enforced by a regression test.
+> **CRITICAL:** Do NOT add a `"hooks"` field to `plugin.json`. This is enforced by a regression test.
 
 ### Why This Matters
 
@@ -131,21 +131,6 @@ Duplicate hooks file detected: ./hooks/hooks.json resolves to already-loaded fil
 The standard hooks/hooks.json is loaded automatically, so manifest.hooks should
 only reference additional hook files.
 ```
-
-### The Flip-Flop History
-
-This has caused repeated fix/revert cycles in this repo:
-
-| Commit | Action | Trigger |
-|--------|--------|---------|
-| `22ad036` | ADD hooks | Users reported "hooks not loading" |
-| `a7bc5f2` | REMOVE hooks | Users reported "duplicate hooks error" (#52) |
-| `779085e` | ADD hooks | Users reported "agents not loading" (#88) |
-| `e3a1306` | REMOVE hooks | Users reported "duplicate hooks error" (#103) |
-
-**Root cause:** Claude Code CLI changed behavior between versions:
-- Pre-v2.1: Required explicit `hooks` declaration
-- v2.1+: Auto-loads by convention, errors on duplicate
 
 ### Current Rule (Enforced by Test)
 

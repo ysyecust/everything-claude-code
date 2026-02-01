@@ -142,8 +142,6 @@ Add to your `~/.claude/settings.json`.
 
 ### 2. Initialize Directory Structure
 
-The Python CLI will create these automatically, but you can also create them manually:
-
 ```bash
 mkdir -p ~/.claude/homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}
 touch ~/.claude/homunculus/observations.jsonl
@@ -169,41 +167,7 @@ touch ~/.claude/homunculus/observations.jsonl
 
 ## Configuration
 
-Edit `config.json`:
-
-```json
-{
-  "version": "2.0",
-  "observation": {
-    "enabled": true,
-    "store_path": "~/.claude/homunculus/observations.jsonl",
-    "max_file_size_mb": 10,
-    "archive_after_days": 7
-  },
-  "instincts": {
-    "personal_path": "~/.claude/homunculus/instincts/personal/",
-    "inherited_path": "~/.claude/homunculus/instincts/inherited/",
-    "min_confidence": 0.3,
-    "auto_approve_threshold": 0.7,
-    "confidence_decay_rate": 0.05
-  },
-  "observer": {
-    "enabled": true,
-    "model": "haiku",
-    "run_interval_minutes": 5,
-    "patterns_to_detect": [
-      "user_corrections",
-      "error_resolutions",
-      "repeated_workflows",
-      "tool_preferences"
-    ]
-  },
-  "evolution": {
-    "cluster_threshold": 3,
-    "evolved_path": "~/.claude/homunculus/evolved/"
-  }
-}
-```
+Edit `config.json` in this skill directory.
 
 ## File Structure
 
@@ -221,17 +185,7 @@ Edit `config.json`:
     └── commands/           # Generated commands
 ```
 
-## Integration with Skill Creator
-
-When you use the [Skill Creator GitHub App](https://skill-creator.app), it now generates **both**:
-- Traditional SKILL.md files (for backward compatibility)
-- Instinct collections (for v2 learning system)
-
-Instincts from repo analysis have `source: "repo-analysis"` and include the source repository URL.
-
 ## Confidence Scoring
-
-Confidence evolves over time:
 
 | Score | Meaning | Behavior |
 |-------|---------|----------|
@@ -240,45 +194,9 @@ Confidence evolves over time:
 | 0.7 | Strong | Auto-approved for application |
 | 0.9 | Near-certain | Core behavior |
 
-**Confidence increases** when:
-- Pattern is repeatedly observed
-- User doesn't correct the suggested behavior
-- Similar instincts from other sources agree
-
-**Confidence decreases** when:
-- User explicitly corrects the behavior
-- Pattern isn't observed for extended periods
-- Contradicting evidence appears
-
-## Why Hooks vs Skills for Observation?
-
-> "v1 relied on skills to observe. Skills are probabilistic—they fire ~50-80% of the time based on Claude's judgment."
-
-Hooks fire **100% of the time**, deterministically. This means:
-- Every tool call is observed
-- No patterns are missed
-- Learning is comprehensive
-
-## Backward Compatibility
-
-v2 is fully compatible with v1:
-- Existing `~/.claude/skills/learned/` skills still work
-- Stop hook still runs (but now also feeds into v2)
-- Gradual migration path: run both in parallel
-
 ## Privacy
 
 - Observations stay **local** on your machine
 - Only **instincts** (patterns) can be exported
 - No actual code or conversation content is shared
 - You control what gets exported
-
-## Related
-
-- [Skill Creator](https://skill-creator.app) - Generate instincts from repo history
-- [Homunculus](https://github.com/humanplane/homunculus) - Inspiration for v2 architecture
-- [The Longform Guide](https://x.com/affaanmustafa/status/2014040193557471352) - Continuous learning section
-
----
-
-*Instinct-based learning: teaching Claude your patterns, one observation at a time.*

@@ -1,153 +1,104 @@
 #!/bin/bash
-# Continuous Learning v2 - Observation Hook
-#
-# Captures tool use events for pattern analysis.
-# Claude Code passes hook data via stdin as JSON.
-#
-# Hook config (in ~/.claude/settings.json):
-#
-# If installed as a plugin, use ${CLAUDE_PLUGIN_ROOT}:
-# {
-#   "hooks": {
-#     "PreToolUse": [{
-#       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/hooks/observe.sh pre" }]
-#     }],
-#     "PostToolUse": [{
-#       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/hooks/observe.sh post" }]
-#     }]
-#   }
-# }
-#
-# If installed manually to ~/.claude/skills:
-# {
-#   "hooks": {
-#     "PreToolUse": [{
-#       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh pre" }]
-#     }],
-#     "PostToolUse": [{
-#       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh post" }]
-#     }]
-#   }
-# }
-
 set -e
 
-CONFIG_DIR="${HOME}/.claude/homunculus"
-OBSERVATIONS_FILE="${CONFIG_DIR}/observations.jsonl"
-MAX_FILE_SIZE_MB=10
+# Hook script for capturing PreToolUse/PostToolUse events as observations.
+# Writes structured observation data to ~/.claude/homunculus/observations.jsonl
+# for later analysis by the observer agent.
 
-# Ensure directory exists
+# --- Configuration ---
+CONFIG_DIR="$HOME/.claude/homunculus"
+OBSERVATIONS_FILE="$CONFIG_DIR/observations.jsonl"
+MAX_FILE_SIZE_MB=10
+OBSERVER_PID_FILE="$CONFIG_DIR/observer.pid"
+
+# --- Ensure directories exist ---
 mkdir -p "$CONFIG_DIR"
 
-# Skip if disabled
-if [ -f "$CONFIG_DIR/disabled" ]; then
-  exit 0
-fi
-
-# Read JSON from stdin (Claude Code hook format)
-INPUT_JSON=$(cat)
-
-# Exit if no input
-if [ -z "$INPUT_JSON" ]; then
-  exit 0
-fi
-
-# Parse using python (more reliable than jq for complex JSON)
-PARSED=$(python3 << EOF
-import json
-import sys
+# --- Parse event from stdin ---
+# Claude Code hooks receive JSON on stdin with event details.
+# We use python3 for reliable JSON parsing.
+parse_event() {
+    python3 -c "
+import json, sys, time
 
 try:
-    data = json.loads('''$INPUT_JSON''')
+    event = json.load(sys.stdin)
+except (json.JSONDecodeError, Exception):
+    sys.exit(0)
 
-    # Extract fields - Claude Code hook format
-    hook_type = data.get('hook_type', 'unknown')  # PreToolUse or PostToolUse
-    tool_name = data.get('tool_name', data.get('tool', 'unknown'))
-    tool_input = data.get('tool_input', data.get('input', {}))
-    tool_output = data.get('tool_output', data.get('output', ''))
-    session_id = data.get('session_id', 'unknown')
+hook_type = event.get('hook', '')
+tool_name = event.get('tool_name', '')
+tool_input = event.get('tool_input', {})
+tool_output = event.get('tool_output', None)
+session_id = event.get('session_id', 'unknown')
 
-    # Truncate large inputs/outputs
-    if isinstance(tool_input, dict):
-        tool_input_str = json.dumps(tool_input)[:5000]
-    else:
-        tool_input_str = str(tool_input)[:5000]
-
-    if isinstance(tool_output, dict):
-        tool_output_str = json.dumps(tool_output)[:5000]
-    else:
-        tool_output_str = str(tool_output)[:5000]
-
-    # Determine event type
-    event = 'tool_start' if 'Pre' in hook_type else 'tool_complete'
-
-    print(json.dumps({
-        'parsed': True,
-        'event': event,
-        'tool': tool_name,
-        'input': tool_input_str if event == 'tool_start' else None,
-        'output': tool_output_str if event == 'tool_complete' else None,
-        'session': session_id
-    }))
-except Exception as e:
-    print(json.dumps({'parsed': False, 'error': str(e)}))
-EOF
-)
-
-# Check if parsing succeeded
-PARSED_OK=$(echo "$PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin).get('parsed', False))")
-
-if [ "$PARSED_OK" != "True" ]; then
-  # Fallback: log raw input for debugging
-  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  echo "{\"timestamp\":\"$timestamp\",\"event\":\"parse_error\",\"raw\":$(echo "$INPUT_JSON" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()[:1000]))')}" >> "$OBSERVATIONS_FILE"
-  exit 0
-fi
-
-# Archive if file too large
-if [ -f "$OBSERVATIONS_FILE" ]; then
-  file_size_mb=$(du -m "$OBSERVATIONS_FILE" 2>/dev/null | cut -f1)
-  if [ "${file_size_mb:-0}" -ge "$MAX_FILE_SIZE_MB" ]; then
-    archive_dir="${CONFIG_DIR}/observations.archive"
-    mkdir -p "$archive_dir"
-    mv "$OBSERVATIONS_FILE" "$archive_dir/observations-$(date +%Y%m%d-%H%M%S).jsonl"
-  fi
-fi
-
-# Build and write observation
-timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-python3 << EOF
-import json
-
-parsed = json.loads('''$PARSED''')
+# Build observation record
 observation = {
-    'timestamp': '$timestamp',
-    'event': parsed['event'],
-    'tool': parsed['tool'],
-    'session': parsed['session']
+    'timestamp': time.time(),
+    'iso_time': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+    'session_id': session_id,
+    'hook_type': hook_type,
+    'tool_name': tool_name,
 }
 
-if parsed['input']:
-    observation['input'] = parsed['input']
-if parsed['output']:
-    observation['output'] = parsed['output']
+if hook_type == 'PreToolUse':
+    observation['phase'] = 'pre'
+    observation['tool_input'] = tool_input
+elif hook_type == 'PostToolUse':
+    observation['phase'] = 'post'
+    observation['tool_input'] = tool_input
+    if tool_output is not None:
+        # Truncate large outputs to keep file manageable
+        output_str = str(tool_output)
+        if len(output_str) > 2000:
+            output_str = output_str[:2000] + '...[truncated]'
+        observation['tool_output_preview'] = output_str
 
-with open('$OBSERVATIONS_FILE', 'a') as f:
-    f.write(json.dumps(observation) + '\n')
-EOF
+print(json.dumps(observation))
+"
+}
 
-# Signal observer if running
-OBSERVER_PID_FILE="${CONFIG_DIR}/.observer.pid"
-if [ -f "$OBSERVER_PID_FILE" ]; then
-  observer_pid=$(cat "$OBSERVER_PID_FILE")
-  if kill -0 "$observer_pid" 2>/dev/null; then
-    kill -USR1 "$observer_pid" 2>/dev/null || true
-  fi
+# --- Rotate file if too large ---
+rotate_if_needed() {
+    if [ -f "$OBSERVATIONS_FILE" ]; then
+        local file_size_bytes
+        file_size_bytes=$(stat -f%z "$OBSERVATIONS_FILE" 2>/dev/null || stat --format=%s "$OBSERVATIONS_FILE" 2>/dev/null || echo 0)
+        local max_size_bytes=$((MAX_FILE_SIZE_MB * 1024 * 1024))
+
+        if [ "$file_size_bytes" -ge "$max_size_bytes" ]; then
+            local rotated_file="${OBSERVATIONS_FILE}.$(date +%Y%m%d%H%M%S).bak"
+            mv "$OBSERVATIONS_FILE" "$rotated_file"
+
+            # Keep only the 3 most recent backups
+            ls -t "${OBSERVATIONS_FILE}".*.bak 2>/dev/null | tail -n +4 | xargs rm -f 2>/dev/null || true
+        fi
+    fi
+}
+
+# --- Signal observer agent if running ---
+signal_observer() {
+    if [ -f "$OBSERVER_PID_FILE" ]; then
+        local pid
+        pid=$(cat "$OBSERVER_PID_FILE" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -USR1 "$pid" 2>/dev/null || true
+        fi
+    fi
+}
+
+# --- Main ---
+observation=$(parse_event)
+
+# Exit silently if parsing produced no output
+if [ -z "$observation" ]; then
+    exit 0
 fi
 
-exit 0
+# Rotate log if needed
+rotate_if_needed
+
+# Append observation
+echo "$observation" >> "$OBSERVATIONS_FILE"
+
+# Signal observer (non-blocking, best-effort)
+signal_observer &

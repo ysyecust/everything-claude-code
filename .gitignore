@@ -30,3 +30,36 @@ examples/sessions/*.tmp
 
 # Local drafts
 marketing/
+
+# C++ build artifacts
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# C++ compiler intermediates
+*.d
+*.gcno
+*.gcda
+*.gcov
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+
+# Compilation database
+compile_commands.json
+
+# Conan / vcpkg
+conan/
+vcpkg_installed/

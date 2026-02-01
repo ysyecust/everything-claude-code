@@ -30,57 +30,20 @@ Exports instincts to a shareable format. Perfect for:
    - Remove timestamps older than "last week"
 4. Generate export file
 
-## Output Format
-
-Creates a YAML file:
-
-```yaml
-# Instincts Export
-# Generated: 2025-01-22
-# Source: personal
-# Count: 12 instincts
-
-version: "2.0"
-exported_by: "continuous-learning-v2"
-export_date: "2025-01-22T10:30:00Z"
-
-instincts:
-  - id: prefer-functional-style
-    trigger: "when writing new functions"
-    action: "Use functional patterns over classes"
-    confidence: 0.8
-    domain: code-style
-    observations: 8
-
-  - id: test-first-workflow
-    trigger: "when adding new functionality"
-    action: "Write test first, then implementation"
-    confidence: 0.9
-    domain: testing
-    observations: 12
-
-  - id: grep-before-edit
-    trigger: "when modifying code"
-    action: "Search with Grep, confirm with Read, then Edit"
-    confidence: 0.7
-    domain: workflow
-    observations: 6
-```
-
 ## Privacy Considerations
 
 Exports include:
-- ✅ Trigger patterns
-- ✅ Actions
-- ✅ Confidence scores
-- ✅ Domains
-- ✅ Observation counts
+- Trigger patterns
+- Actions
+- Confidence scores
+- Domains
+- Observation counts
 
 Exports do NOT include:
-- ❌ Actual code snippets
-- ❌ File paths
-- ❌ Session transcripts
-- ❌ Personal identifiers
+- Actual code snippets
+- File paths
+- Session transcripts
+- Personal identifiers
 
 ## Flags
 

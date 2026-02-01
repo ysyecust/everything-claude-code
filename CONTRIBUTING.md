@@ -1,30 +1,30 @@
 # Contributing to Everything Claude Code
 
-Thanks for wanting to contribute. This repo is meant to be a community resource for Claude Code users.
+Thanks for wanting to contribute. This repo is meant to be a community resource for Claude Code users, focused on C++20 HPC development.
 
 ## What We're Looking For
 
 ### Agents
 
 New agents that handle specific tasks well:
-- Language-specific reviewers (Python, Go, Rust)
-- Framework experts (Django, Rails, Laravel, Spring)
-- DevOps specialists (Kubernetes, Terraform, CI/CD)
-- Domain experts (ML pipelines, data engineering, mobile)
+- HPC specialists (GPU offload, MPI debugging, profiling)
+- Build system experts (Ninja, Meson, Bazel)
+- Domain experts (CFD, FEM, molecular dynamics)
+- Language reviewers (Python bindings, Fortran interop)
 
 ### Skills
 
 Workflow definitions and domain knowledge:
-- Language best practices
-- Framework patterns
-- Testing strategies
+- C++20/23 best practices
+- HPC framework patterns (MPI, OpenMP, SYCL)
+- Testing strategies (Google Test, Catch2)
 - Architecture guides
 - Domain-specific knowledge
 
 ### Commands
 
 Slash commands that invoke useful workflows:
-- Deployment commands
+- Profiling commands (perf, vtune)
 - Testing commands
 - Documentation commands
 - Code generation commands
@@ -32,8 +32,8 @@ Slash commands that invoke useful workflows:
 ### Hooks
 
 Useful automations:
-- Linting/formatting hooks
-- Security checks
+- clang-format / clang-tidy hooks
+- Security checks (sanitizer enforcement)
 - Validation hooks
 - Notification hooks
 
@@ -41,7 +41,7 @@ Useful automations:
 
 Always-follow guidelines:
 - Security rules
-- Code style rules
+- C++20 code style rules
 - Testing requirements
 - Naming conventions
 
@@ -67,7 +67,7 @@ cd everything-claude-code
 ### 2. Create a branch
 
 ```bash
-git checkout -b add-python-reviewer
+git checkout -b add-gpu-offload-agent
 ```
 
 ### 3. Add your contribution
@@ -137,14 +137,27 @@ Detailed instructions...
 
 ### 5. Test your contribution
 
-Make sure your config works with Claude Code before submitting.
+```bash
+# Run the test suite
+node tests/run-all.js
+
+# Run CI validation scripts
+node scripts/ci/validate-agents.js
+node scripts/ci/validate-commands.js
+node scripts/ci/validate-hooks.js
+node scripts/ci/validate-rules.js
+node scripts/ci/validate-skills.js
+
+# If you have a CMake project, also verify builds
+cmake -B build && cmake --build build && ctest --test-dir build
+```
 
 ### 6. Submit a PR
 
 ```bash
 git add .
-git commit -m "Add Python code reviewer agent"
-git push origin add-python-reviewer
+git commit -m "feat: add GPU offload agent"
+git push origin add-gpu-offload-agent
 ```
 
 Then open a PR with:
@@ -176,7 +189,7 @@ Then open a PR with:
 
 ## File Naming
 
-- Use lowercase with hyphens: `python-reviewer.md`
+- Use lowercase with hyphens: `gpu-offload-reviewer.md`
 - Be descriptive: `tdd-workflow.md` not `workflow.md`
 - Match the agent/skill name to the filename
 
@@ -184,7 +197,7 @@ Then open a PR with:
 
 ## Questions?
 
-Open an issue or reach out on X: [@affaanmustafa](https://x.com/affaanmustafa)
+Open an issue on GitHub.
 
 ---
 

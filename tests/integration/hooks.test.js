@@ -16,10 +16,10 @@ const { spawn } = require('child_process');
 function _test(name, fn) {
   try {
     fn();
-    console.log(`  ✓ ${name}`);
+    console.log(`  \u2713 ${name}`);
     return true;
   } catch (err) {
-    console.log(`  ✗ ${name}`);
+    console.log(`  \u2717 ${name}`);
     console.log(`    Error: ${err.message}`);
     return false;
   }
@@ -29,10 +29,10 @@ function _test(name, fn) {
 async function asyncTest(name, fn) {
   try {
     await fn();
-    console.log(`  ✓ ${name}`);
+    console.log(`  \u2713 ${name}`);
     return true;
   } catch (err) {
-    console.log(`  ✗ ${name}`);
+    console.log(`  \u2717 ${name}`);
     console.log(`    Error: ${err.message}`);
     return false;
   }
@@ -74,63 +74,6 @@ function runHookWithInput(scriptPath, input = {}, env = {}, timeoutMs = 10000) {
     const timer = setTimeout(() => {
       proc.kill('SIGKILL');
       reject(new Error(`Hook timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on('close', code => {
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr });
-    });
-
-    proc.on('error', err => {
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
-}
-
-/**
- * Run an inline hook command (like those in hooks.json)
- * @param {string} command - The node -e "..." command
- * @param {object} input - Hook input object
- * @param {object} env - Environment variables
- */
-function _runInlineHook(command, input = {}, env = {}, timeoutMs = 10000) {
-  return new Promise((resolve, reject) => {
-    // Extract the code from node -e "..."
-    const match = command.match(/^node -e "(.+)"$/s);
-    if (!match) {
-      reject(new Error('Invalid inline hook command format'));
-      return;
-    }
-
-    const proc = spawn('node', ['-e', match[1]], {
-      env: { ...process.env, ...env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stdout = '';
-    let stderr = '';
-    let timer;
-
-    proc.stdout.on('data', data => stdout += data);
-    proc.stderr.on('data', data => stderr += data);
-
-    // Ignore EPIPE errors (process may exit before we finish writing)
-    proc.stdin.on('error', (err) => {
-      if (err.code !== 'EPIPE') {
-        if (timer) clearTimeout(timer);
-        reject(err);
-      }
-    });
-
-    if (input && Object.keys(input).length > 0) {
-      proc.stdin.write(JSON.stringify(input));
-    }
-    proc.stdin.end();
-
-    timer = setTimeout(() => {
-      proc.kill('SIGKILL');
-      reject(new Error(`Inline hook timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.on('close', code => {
@@ -197,7 +140,6 @@ async function runTests() {
   })) passed++; else failed++;
 
   if (await asyncTest('hooks parse valid tool_input correctly', async () => {
-    // Test the console.log warning hook with valid input
     const command = 'node -e "const fs=require(\'fs\');let d=\'\';process.stdin.on(\'data\',c=>d+=c);process.stdin.on(\'end\',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path||\'\';console.log(\'Path:\',p)})"';
     const match = command.match(/^node -e "(.+)"$/s);
 
@@ -209,13 +151,13 @@ async function runTests() {
     proc.stdout.on('data', data => stdout += data);
 
     proc.stdin.write(JSON.stringify({
-      tool_input: { file_path: '/test/path.js' }
+      tool_input: { file_path: '/test/path.cpp' }
     }));
     proc.stdin.end();
 
     await new Promise(resolve => proc.on('close', resolve));
 
-    assert.ok(stdout.includes('/test/path.js'), 'Should extract file_path from input');
+    assert.ok(stdout.includes('/test/path.cpp'), 'Should extract file_path from input');
   })) passed++; else failed++;
 
   // ==========================================
@@ -236,7 +178,6 @@ async function runTests() {
   })) passed++; else failed++;
 
   if (await asyncTest('blocking hooks output BLOCKED message', async () => {
-    // Test the dev server blocking hook
     const blockingCommand = hooks.hooks.PreToolUse[0].hooks[0].command;
     const match = blockingCommand.match(/^node -e "(.+)"$/s);
 
@@ -272,7 +213,6 @@ async function runTests() {
   })) passed++; else failed++;
 
   if (await asyncTest('blocking hooks exit with code 1', async () => {
-    // The dev server blocker always blocks
     const blockingCommand = hooks.hooks.PreToolUse[0].hooks[0].command;
     const match = blockingCommand.match(/^node -e "(.+)"$/s);
 
@@ -424,7 +364,7 @@ async function runTests() {
 
   if (await asyncTest('hooks handle very large input without hanging', async () => {
     const largeInput = {
-      tool_input: { file_path: '/test.js' },
+      tool_input: { file_path: '/test.cpp' },
       tool_output: { output: 'x'.repeat(100000) }
     };
 

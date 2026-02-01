@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Stop Hook: Check for console.log statements in modified files
- * 
+ * Stop Hook: Check for debug output statements in modified files
+ *
  * This hook runs after each response and checks if any modified
- * JavaScript/TypeScript files contain console.log statements.
+ * C++/JavaScript files contain debug output statements.
  * It provides warnings to help developers remember to remove
  * debug statements before committing.
+ *
+ * C++ patterns: std::cout, std::cerr, printf, fprintf(stderr, ...)
+ * JS patterns: console.log
  */
 
 const { execSync } = require('child_process');
@@ -36,21 +39,35 @@ process.stdin.on('end', () => {
       stdio: ['pipe', 'pipe', 'pipe']
     })
       .split('\n')
-      .filter(f => /\.(ts|tsx|js|jsx)$/.test(f) && fs.existsSync(f));
+      .filter(f => /\.(cpp|cc|cxx|hpp|h|ts|tsx|js|jsx)$/.test(f) && fs.existsSync(f));
 
-    let hasConsole = false;
+    let hasDebugOutput = false;
 
-    // Check each file for console.log
+    // Check each file for debug output
     for (const file of files) {
       const content = fs.readFileSync(file, 'utf8');
-      if (content.includes('console.log')) {
-        console.error(`[Hook] WARNING: console.log found in ${file}`);
-        hasConsole = true;
+      const isCpp = /\.(cpp|cc|cxx|hpp|h)$/.test(file);
+      const isJs = /\.(ts|tsx|js|jsx)$/.test(file);
+
+      if (isCpp) {
+        // Check for C++ debug output patterns
+        if (/\bstd::cout\b/.test(content) || /\bprintf\s*\(/.test(content) || /\bfprintf\s*\(\s*stderr/.test(content)) {
+          console.error(`[Hook] WARNING: debug output (std::cout/printf) found in ${file}`);
+          hasDebugOutput = true;
+        }
+      }
+
+      if (isJs) {
+        // Check for JS debug output patterns
+        if (content.includes('console.log')) {
+          console.error(`[Hook] WARNING: console.log found in ${file}`);
+          hasDebugOutput = true;
+        }
       }
     }
 
-    if (hasConsole) {
-      console.error('[Hook] Remove console.log statements before committing');
+    if (hasDebugOutput) {
+      console.error('[Hook] Remove debug output statements before committing');
     }
   } catch (_error) {
     // Silently ignore errors (git might not be available, etc.)

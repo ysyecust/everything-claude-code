@@ -12,6 +12,7 @@
 
 ## Checklist
 - [ ] Tests pass locally (`node tests/run-all.js`)
-- [ ] Validation scripts pass
+- [ ] CI validation scripts pass (`node scripts/ci/validate-agents.js` etc.)
+- [ ] C++ builds pass (`cmake --build build && ctest --test-dir build`)
 - [ ] Follows conventional commits format
 - [ ] Updated relevant documentation

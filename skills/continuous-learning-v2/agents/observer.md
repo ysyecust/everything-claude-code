@@ -7,131 +7,41 @@ run_mode: background
 
 # Observer Agent
 
-A background agent that analyzes observations from Claude Code sessions to detect patterns and create instincts.
-
-## When to Run
-
-- After significant session activity (20+ tool calls)
-- When user runs `/analyze-patterns`
-- On a scheduled interval (configurable, default 5 minutes)
-- When triggered by observation hook (SIGUSR1)
-
-## Input
-
-Reads observations from `~/.claude/homunculus/observations.jsonl`:
-
-```jsonl
-{"timestamp":"2025-01-22T10:30:00Z","event":"tool_start","session":"abc123","tool":"Edit","input":"..."}
-{"timestamp":"2025-01-22T10:30:01Z","event":"tool_complete","session":"abc123","tool":"Edit","output":"..."}
-{"timestamp":"2025-01-22T10:30:05Z","event":"tool_start","session":"abc123","tool":"Bash","input":"npm test"}
-{"timestamp":"2025-01-22T10:30:10Z","event":"tool_complete","session":"abc123","tool":"Bash","output":"All tests pass"}
-```
+Background agent that reads from `~/.claude/homunculus/observations.jsonl` and detects patterns across sessions.
 
 ## Pattern Detection
 
-Look for these patterns in observations:
+The observer analyzes accumulated observations to identify four types of patterns:
 
 ### 1. User Corrections
-When a user's follow-up message corrects Claude's previous action:
-- "No, use X instead of Y"
-- "Actually, I meant..."
-- Immediate undo/redo patterns
+When a follow-up message corrects or overrides a previous action, this indicates the original behavior was undesirable. The observer creates an instinct to avoid the corrected behavior in future sessions.
 
-→ Create instinct: "When doing X, prefer Y"
+**Example:** User says "No, use single quotes not double quotes" after a code edit -> instinct: prefer single quotes in this project.
 
 ### 2. Error Resolutions
-When an error is followed by a fix:
-- Tool output contains error
-- Next few tool calls fix it
-- Same error type resolved similarly multiple times
+When an error occurs and is followed by a specific fix, the observer captures the error-to-fix mapping as an instinct. This allows future sessions to skip the error and apply the fix directly.
 
-→ Create instinct: "When encountering error X, try Y"
+**Example:** Build fails with missing import, user adds the import -> instinct: auto-include that import when using the related module.
 
 ### 3. Repeated Workflows
-When the same sequence of tools is used multiple times:
-- Same tool sequence with similar inputs
-- File patterns that change together
-- Time-clustered operations
+When the same sequence of tool calls appears across multiple sessions, the observer recognizes this as a workflow pattern. These become workflow instincts that can suggest or auto-execute multi-step processes.
 
-→ Create workflow instinct: "When doing X, follow steps Y, Z, W"
+**Example:** User consistently runs `lint -> test -> commit` in that order -> instinct: suggest running the full sequence when any one step is initiated.
 
 ### 4. Tool Preferences
-When certain tools are consistently preferred:
-- Always uses Grep before Edit
-- Prefers Read over Bash cat
-- Uses specific Bash commands for certain tasks
+When the user consistently chooses one tool or approach over alternatives, the observer records this preference. These instincts ensure future sessions default to the preferred tool.
 
-→ Create instinct: "When needing X, use tool Y"
+**Example:** User always uses `rg` instead of `grep` for searching -> instinct: prefer ripgrep for search operations.
 
 ## Output
 
-Creates/updates instincts in `~/.claude/homunculus/instincts/personal/`:
+Creates instincts in `~/.claude/homunculus/instincts/personal/` with confidence scores based on observation frequency:
 
-```yaml
----
-id: prefer-grep-before-edit
-trigger: "when searching for code to modify"
-confidence: 0.65
-domain: "workflow"
-source: "session-observation"
----
+| Observation Count | Confidence | Meaning |
+|---|---|---|
+| 1 | 0.3 | Initial observation, low confidence |
+| 2-3 | 0.4-0.5 | Emerging pattern |
+| 4-6 | 0.55-0.7 | Established pattern |
+| 7+ | 0.75-0.85+ | Strong instinct, high confidence |
 
-# Prefer Grep Before Edit
-
-## Action
-Always use Grep to find the exact location before using Edit.
-
-## Evidence
-- Observed 8 times in session abc123
-- Pattern: Grep → Read → Edit sequence
-- Last observed: 2025-01-22
-```
-
-## Confidence Calculation
-
-Initial confidence based on observation frequency:
-- 1-2 observations: 0.3 (tentative)
-- 3-5 observations: 0.5 (moderate)
-- 6-10 observations: 0.7 (strong)
-- 11+ observations: 0.85 (very strong)
-
-Confidence adjusts over time:
-- +0.05 for each confirming observation
-- -0.1 for each contradicting observation
-- -0.02 per week without observation (decay)
-
-## Important Guidelines
-
-1. **Be Conservative**: Only create instincts for clear patterns (3+ observations)
-2. **Be Specific**: Narrow triggers are better than broad ones
-3. **Track Evidence**: Always include what observations led to the instinct
-4. **Respect Privacy**: Never include actual code snippets, only patterns
-5. **Merge Similar**: If a new instinct is similar to existing, update rather than duplicate
-
-## Example Analysis Session
-
-Given observations:
-```jsonl
-{"event":"tool_start","tool":"Grep","input":"pattern: useState"}
-{"event":"tool_complete","tool":"Grep","output":"Found in 3 files"}
-{"event":"tool_start","tool":"Read","input":"src/hooks/useAuth.ts"}
-{"event":"tool_complete","tool":"Read","output":"[file content]"}
-{"event":"tool_start","tool":"Edit","input":"src/hooks/useAuth.ts..."}
-```
-
-Analysis:
-- Detected workflow: Grep → Read → Edit
-- Frequency: Seen 5 times this session
-- Create instinct:
-  - trigger: "when modifying code"
-  - action: "Search with Grep, confirm with Read, then Edit"
-  - confidence: 0.6
-  - domain: "workflow"
-
-## Integration with Skill Creator
-
-When instincts are imported from Skill Creator (repo analysis), they have:
-- `source: "repo-analysis"`
-- `source_repo: "https://github.com/..."`
-
-These should be treated as team/project conventions with higher initial confidence (0.7+).
+Confidence is capped at 0.85 to allow for user override. Only observations with 2+ occurrences generate instincts. Single observations are retained for future correlation but do not create instinct files.
