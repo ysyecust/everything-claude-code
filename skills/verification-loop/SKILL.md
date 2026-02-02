@@ -1,3 +1,7 @@
+---
+description: Continuous verification loop that runs build, type check, lint, test, and security scans after each code change to catch regressions early.
+---
+
 # Verification Loop Skill
 
 A comprehensive verification system for Claude Code sessions.

@@ -1,3 +1,7 @@
+---
+description: Save a verification checkpoint of the current session state with metadata for later restoration.
+---
+
 # Checkpoint Command
 
 Create or verify a checkpoint in your workflow.

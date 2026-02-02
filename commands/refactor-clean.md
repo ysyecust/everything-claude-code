@@ -1,3 +1,7 @@
+---
+description: Safely identify and remove dead code, unused imports, and duplicate logic with test verification after each removal.
+---
+
 # Refactor Clean
 
 Safely identify and remove dead code with test verification:

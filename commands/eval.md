@@ -1,3 +1,7 @@
+---
+description: Run eval-driven development workflow. Execute verification loops and evaluate session outcomes against defined criteria.
+---
+
 # Eval Command
 
 Manage eval-driven development workflow.

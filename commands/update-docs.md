@@ -1,3 +1,7 @@
+---
+description: Sync documentation from source-of-truth. Update READMEs, API docs, and guides to reflect current codebase state.
+---
+
 # Update Documentation
 
 Sync documentation from source-of-truth:

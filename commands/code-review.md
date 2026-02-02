@@ -1,3 +1,7 @@
+---
+description: Comprehensive security and quality review of uncommitted changes. Checks for hardcoded secrets, memory safety, RAII compliance, and performance issues.
+---
+
 # Code Review
 
 Comprehensive security and quality review of uncommitted changes:

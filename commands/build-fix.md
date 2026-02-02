@@ -1,3 +1,7 @@
+---
+description: Incrementally fix C++20/CMake build errors. Parses compiler output, diagnoses root cause, and applies minimal surgical fixes one at a time.
+---
+
 # Build Fix
 
 Incrementally fix C++20/CMake build errors:

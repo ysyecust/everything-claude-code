@@ -1,3 +1,7 @@
+---
+description: Scan codebase structure and regenerate architecture documentation in docs/CODEMAPS/ with dependency graphs and module summaries.
+---
+
 # Update Codemaps
 
 Analyze the codebase structure and update architecture documentation:

@@ -1,3 +1,7 @@
+---
+description: Analyze test coverage via gcov/lcov and generate tests for uncovered code paths. Target 80%+ line coverage.
+---
+
 # Test Coverage
 
 Analyze test coverage and generate missing tests using gcov/lcov:

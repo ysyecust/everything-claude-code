@@ -1,3 +1,7 @@
+---
+description: Multi-agent task orchestration. Run agents in sequence or parallel for complex workflows like plan → tdd → code-review → verify.
+---
+
 # Orchestrate Command
 
 Sequential agent workflow for complex tasks.
