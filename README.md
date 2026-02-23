@@ -37,6 +37,8 @@ everything-claude-code/
 |   |-- security-reviewer.md     # Sanitizer and vulnerability analysis
 |   |-- build-error-resolver.md  # CMake/linker/template error resolution
 |   |-- integration-test-runner.md  # CTest integration testing
+|   |-- e2e-runner.md            # E2E testing with Playwright
+|   |-- python-reviewer.md       # Python code review (PEP 8, security)
 |   |-- refactor-cleaner.md      # Dead code cleanup
 |   |-- doc-updater.md           # Documentation sync
 |   |-- database-reviewer.md     # SQL/database review
@@ -46,6 +48,7 @@ everything-claude-code/
 |-- skills/           # Workflow definitions and domain knowledge
 |   |                             # --- C++20 HPC ---
 |   |-- coding-standards/           # C++20 naming, concepts, ranges
+|   |-- cpp-coding-standards/       # C++ Core Guidelines (C++17/20/23)
 |   |-- hpc-patterns/              # Cache-friendly, SIMD, threading, NUMA
 |   |-- numerical-patterns/         # Sparse matrices, solvers, HPC I/O
 |   |-- tdd-workflow/               # Google Test/Mock TDD methodology
@@ -57,6 +60,14 @@ everything-claude-code/
 |   |-- security-review/            # Security checklist + cloud infrastructure
 |   |-- eval-harness/               # Verification loop evaluation
 |   |-- verification-loop/          # Continuous verification
+|   |-- search-first/              # Research-before-coding workflow
+|   |-- cost-aware-llm-pipeline/   # LLM API cost optimization patterns
+|   |-- content-hash-cache-pattern/ # SHA-256 content-hash file caching
+|   |-- regex-vs-llm-structured-text/ # Regex vs LLM decision framework
+|   |-- docker-patterns/           # Docker/Compose best practices
+|   |-- deployment-patterns/       # CI/CD, rollback, health checks
+|   |-- database-migrations/       # Zero-downtime migration patterns
+|   |-- e2e-testing/               # Playwright E2E testing patterns
 |   |                             # --- Multi-language (from upstream) ---
 |   |-- golang-patterns/           # Go idioms and best practices
 |   |-- golang-testing/            # Go table-driven tests, benchmarks
@@ -77,6 +88,7 @@ everything-claude-code/
 |   |-- test-coverage.md      # /test-coverage - gcov/lcov coverage
 |   |-- refactor-clean.md     # /refactor-clean - Dead code removal
 |   |-- learn.md              # /learn - Extract patterns mid-session
+|   |-- learn-eval.md         # /learn-eval - Extract + evaluate + save
 |   |-- checkpoint.md         # /checkpoint - Save verification state
 |   |-- verify.md             # /verify - Run verification loop
 |   |-- setup-pm.md           # /setup-pm - Configure build system
@@ -87,15 +99,28 @@ everything-claude-code/
 |   |-- evolve.md             # /evolve - Cluster instincts into skills
 |   |-- orchestrate.md        # /orchestrate - Multi-agent task orchestration
 |   |-- eval.md               # /eval - Run evaluation harness
+|   |-- e2e.md                # /e2e - E2E testing with Playwright
+|   |-- multi-plan.md         # /multi-plan - Multi-model collaborative planning
+|   |-- multi-execute.md      # /multi-execute - Multi-model execution
+|   |-- multi-workflow.md     # /multi-workflow - Full development workflow
 |
-|-- rules/            # Always-follow guidelines
-|   |-- security.md         # Buffer overflow, use-after-free, sanitizers
-|   |-- coding-style.md     # RAII, const correctness, C++20 features
-|   |-- testing.md          # Google Test, 80% coverage requirement
-|   |-- git-workflow.md     # Commit format, PR process
-|   |-- agents.md           # When to delegate to subagents
-|   |-- performance.md      # Model selection, context management
-|   |-- patterns.md         # Result type, CRTP, Builder pattern
+|-- rules/            # Always-follow guidelines (language-organized)
+|   |-- common/              # Language-agnostic rules
+|   |   |-- coding-style.md      # General coding principles
+|   |   |-- security.md          # OWASP, secrets, input validation
+|   |   |-- testing.md           # Coverage, TDD, test quality
+|   |   |-- git-workflow.md      # Commit format, PR process
+|   |   |-- agents.md            # When to delegate to subagents
+|   |   |-- performance.md       # Model selection, context management
+|   |   |-- patterns.md          # Design patterns
+|   |   |-- hooks.md             # Hook conventions
+|   |-- cpp/                 # C++20 HPC specific rules
+|   |   |-- coding-style.md      # RAII, const correctness, C++20
+|   |   |-- security.md          # Buffer overflow, sanitizers
+|   |   |-- testing.md           # Google Test, 80% coverage
+|   |   |-- patterns.md          # CRTP, Result type, Builder
+|   |-- golang/              # Go specific rules
+|   |-- python/              # Python specific rules
 |
 |-- hooks/            # Trigger-based automations
 |   |-- hooks.json                # clang-format, syntax check, debug detection
@@ -337,6 +362,8 @@ Subagents handle delegated tasks with limited scope:
 
 - **planner** - Feature implementation planning
 - **architect** - System design decisions
+- **e2e-runner** - Playwright E2E testing
+- **python-reviewer** - Python code review (PEP 8, type hints, security)
 - **refactor-cleaner** - Dead code cleanup
 - **doc-updater** - Documentation sync
 - **database-reviewer** - SQL/database review
@@ -347,6 +374,7 @@ Subagents handle delegated tasks with limited scope:
 **C++20 HPC domain knowledge:**
 
 - **coding-standards** - Naming, concepts, ranges, constexpr
+- **cpp-coding-standards** - C++ Core Guidelines (C++17/20/23)
 - **hpc-patterns** - Cache-friendly data, SIMD, threading, NUMA
 - **numerical-patterns** - Sparse matrices, CG/GMRES, HPC I/O
 - **tdd-workflow** - Google Test parameterized tests, CMake integration
@@ -358,6 +386,17 @@ Subagents handle delegated tasks with limited scope:
 - **strategic-compact** - Manual compaction suggestions
 - **eval-harness** - Verification loop evaluation
 - **security-review** - Security checklist + cloud infrastructure
+- **search-first** - Research-before-coding workflow
+- **cost-aware-llm-pipeline** - LLM API cost optimization
+- **content-hash-cache-pattern** - SHA-256 content-hash file caching
+- **regex-vs-llm-structured-text** - Regex vs LLM decision framework
+
+**Infrastructure & DevOps:**
+
+- **docker-patterns** - Docker/Compose for containerized dev
+- **deployment-patterns** - CI/CD, rollback, health checks
+- **database-migrations** - Zero-downtime migration patterns
+- **e2e-testing** - Playwright E2E testing patterns
 
 **Multi-language (from upstream):**
 
@@ -383,12 +422,15 @@ Hooks fire on tool events:
 
 ### Rules
 
-Always-follow guidelines for C++20:
+Organized by language with common cross-cutting rules:
 
-- **security.md** - Buffer overflow, use-after-free, CWE Top 25
-- **coding-style.md** - RAII, const correctness, move semantics
-- **testing.md** - Google Test, 80% coverage, TDD workflow
-- **patterns.md** - Result type, CRTP, Builder pattern
+**Common (all languages):** coding-style, security, testing, git-workflow, agents, performance, patterns, hooks
+
+**C++ specific:** RAII, const correctness, move semantics, sanitizers, Google Test
+
+**Go specific:** Error handling, goroutines, interfaces, testing
+
+**Python specific:** PEP 8, type hints, virtual environments, security
 
 ---
 

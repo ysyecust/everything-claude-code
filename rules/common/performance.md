@@ -7,7 +7,7 @@
 - Pair programming and code generation
 - Worker agents in multi-agent systems
 
-**Sonnet 4.5** (Best coding model):
+**Sonnet 4.6** (Best coding model):
 - Main development work
 - Orchestrating multi-agent workflows
 - Complex coding tasks
@@ -30,13 +30,21 @@ Lower context sensitivity tasks:
 - Documentation updates
 - Simple bug fixes
 
-## Ultrathink + Plan Mode
+## Extended Thinking + Plan Mode
+
+Extended thinking is enabled by default, reserving up to 31,999 tokens for internal reasoning.
+
+Control extended thinking via:
+- **Toggle**: Option+T (macOS) / Alt+T (Windows/Linux)
+- **Config**: Set `alwaysThinkingEnabled` in `~/.claude/settings.json`
+- **Budget cap**: `export MAX_THINKING_TOKENS=10000`
+- **Verbose mode**: Ctrl+O to see thinking output
 
 For complex tasks requiring deep reasoning:
-1. Use `ultrathink` for enhanced thinking
+1. Ensure extended thinking is enabled (on by default)
 2. Enable **Plan Mode** for structured approach
-3. "Rev the engine" with multiple critique rounds
-4. Use split role sub-agents for diverse analysis
+3. Use multiple critique rounds for thorough analysis
+4. Use split role sub-agents for diverse perspectives
 
 ## Build Troubleshooting
 
@@ -45,30 +53,3 @@ If build fails:
 2. Analyze error messages
 3. Fix incrementally
 4. Verify after each fix
-
-### Common Build Commands
-
-```bash
-# Configure
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-# Build (parallel)
-cmake --build build -j$(nproc)
-
-# Run tests
-ctest --test-dir build --output-on-failure
-
-# Run specific test
-ctest --test-dir build -R "test_name"
-
-# Build with sanitizers (Debug)
-cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
-cmake --build build-debug -j$(nproc)
-
-# Coverage build
-cmake -B build-cov -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_FLAGS="--coverage"
-cmake --build build-cov -j$(nproc)
-ctest --test-dir build-cov
-```

@@ -3,47 +3,47 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build.*&&.*\\./|make.*&&.*\\./|mpirun)\"",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"console.error('[Hook] BLOCKED: Long-running process must run in tmux for log access');console.error('[Hook] Use: tmux new-session -d -s build \\\"cmake --build build\\\"');console.error('[Hook] Then: tmux attach -t build');process.exit(1)\""
+            "command": "node -e \"let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/(cmake --build.*&&.*\\.\\/|make.*&&.*\\.\\/|mpirun|mpiexec|srun)/.test(cmd)){console.error('[Hook] BLOCKED: Long-running process must run in tmux for log access');console.error('[Hook] Use: tmux new-session -d -s build \\\"cmake --build build\\\"');console.error('[Hook] Then: tmux attach -t build');process.exit(2)}}catch{}console.log(d)})\""
           }
         ],
         "description": "Block long-running build/run outside tmux - ensures you can access logs"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build|make -j|ctest|mpirun|mpiexec|srun)\"",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"if(!process.env.TMUX){console.error('[Hook] Consider running in tmux for session persistence');console.error('[Hook] tmux new -s build  |  tmux attach -t build')}\""
+            "command": "node -e \"let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(!process.env.TMUX&&/(cmake --build|make -j|ctest|mpirun|mpiexec|srun|docker\\b|pytest)/.test(cmd)){console.error('[Hook] Consider running in tmux for session persistence');console.error('[Hook] tmux new -s build  |  tmux attach -t build')}}catch{}console.log(d)})\""
           }
         ],
         "description": "Reminder to use tmux for long-running commands (cmake/make/ctest/mpirun)"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"git push\"",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"console.error('[Hook] Review changes before push...');console.error('[Hook] Continuing with push (remove this hook to add interactive review)')\""
+            "command": "node -e \"let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/git push/.test(cmd)){console.error('[Hook] Review changes before push...');console.error('[Hook] Continuing with push (remove this hook to add interactive review)')}}catch{}console.log(d)})\""
           }
         ],
         "description": "Reminder before git push to review changes"
       },
       {
-        "matcher": "tool == \"Write\" && tool_input.file_path matches \"\\\\.(md|txt)$\" && !(tool_input.file_path matches \"README\\\\.md|CLAUDE\\\\.md|AGENTS\\\\.md|CONTRIBUTING\\\\.md\")",
+        "matcher": "Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path||'';if(/\\.(md|txt)$/.test(p)&&!/(README|CLAUDE|AGENTS|CONTRIBUTING)\\.md$/.test(p)){console.error('[Hook] BLOCKED: Unnecessary documentation file creation');console.error('[Hook] File: '+p);console.error('[Hook] Use README.md for documentation instead');process.exit(1)}console.log(d)})\""
+            "command": "node -e \"const fs=require('fs');let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const p=i.tool_input?.file_path||'';if(/\\.(md|txt)$/.test(p)&&!/(README|CLAUDE|AGENTS|CONTRIBUTING)\\.md$/.test(p)&&!/\\.claude\\/plans\\//.test(p)){console.error('[Hook] BLOCKED: Unnecessary documentation file creation');console.error('[Hook] File: '+p);console.error('[Hook] Use README.md for documentation instead');process.exit(2)}}catch{}console.log(d)})\""
           }
         ],
         "description": "Block creation of random .md files - keeps docs consolidated"
       },
       {
-        "matcher": "tool == \"Edit\" || tool == \"Write\"",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -79,21 +79,21 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "tool == \"Bash\"",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/gh pr create/.test(cmd)){const out=i.tool_output?.output||'';const m=out.match(/https:\\/\\/github.com\\/[^/]+\\/[^/]+\\/pull\\/\\d+/);if(m){console.error('[Hook] PR created: '+m[0]);const repo=m[0].replace(/https:\\/\\/github.com\\/([^/]+\\/[^/]+)\\/pull\\/\\d+/,'$1');const pr=m[0].replace(/.*\\/pull\\/(\\d+)/,'$1');console.error('[Hook] To review: gh pr review '+pr+' --repo '+repo)}}console.log(d)})\""
+            "command": "node -e \"let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/gh pr create/.test(cmd)){const out=i.tool_output?.output||'';const m=out.match(/https:\\/\\/github.com\\/[^/]+\\/[^/]+\\/pull\\/\\d+/);if(m){console.error('[Hook] PR created: '+m[0]);const repo=m[0].replace(/https:\\/\\/github.com\\/([^/]+\\/[^/]+)\\/pull\\/\\d+/,'$1');const pr=m[0].replace(/.*\\/pull\\/(\\d+)/,'$1');console.error('[Hook] To review: gh pr review '+pr+' --repo '+repo)}}}catch{}console.log(d)})\""
           }
         ],
         "description": "Log PR URL and provide review command after PR creation"
       },
       {
-        "matcher": "tool == \"Bash\" && tool_input.command matches \"(cmake --build|make -j|ctest)\"",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{console.error('[Hook] Build completed - async analysis running in background');console.log(d)})\"",
+            "command": "node -e \"let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const cmd=i.tool_input?.command||'';if(/(cmake --build|make -j|ctest)/.test(cmd)){console.error('[Hook] Build completed - async analysis running in background')}}catch{}console.log(d)})\"",
             "async": true,
             "timeout": 30
           }
@@ -101,31 +101,31 @@
         "description": "Async hook for build analysis (runs in background without blocking)"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|hpp|cc|h|cxx|hxx)$\"",
+        "matcher": "Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const{execFileSync}=require('child_process');const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){try{execFileSync('clang-format',['--style=Google','-i',p],{stdio:['pipe','pipe','pipe']})}catch(e){}}console.log(d)})\""
+            "command": "node -e \"const{execFileSync}=require('child_process');const fs=require('fs');let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&/\\.(cpp|hpp|cc|h|cxx|hxx)$/.test(p)&&fs.existsSync(p)){try{execFileSync('clang-format',['--style=Google','-i',p],{stdio:['pipe','pipe','pipe']})}catch(e){}}}catch{}console.log(d)})\""
           }
         ],
         "description": "Auto-format C++ files with clang-format (Google style) after edits"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|cc|cxx)$\"",
+        "matcher": "Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const{execSync}=require('child_process');const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){try{const r=execSync('g++ -std=c++20 -Wall -Wextra -fsyntax-only \"'+p+'\" 2>&1',{encoding:'utf8',stdio:['pipe','pipe','pipe']});if(r.trim())console.error(r.trim())}catch(e){const out=(e.stdout||'')+(e.stderr||'');const lines=out.split('\\n').filter(l=>l.includes('error')||l.includes('warning')).slice(0,10);if(lines.length)console.error(lines.join('\\n'))}}console.log(d)})\""
+            "command": "node -e \"const{execSync}=require('child_process');const fs=require('fs');let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&/\\.(cpp|cc|cxx)$/.test(p)&&fs.existsSync(p)){try{const r=execSync('g++ -std=c++20 -Wall -Wextra -fsyntax-only \\\"'+p+'\\\" 2>&1',{encoding:'utf8',stdio:['pipe','pipe','pipe']});if(r.trim())console.error(r.trim())}catch(e){const out=(e.stdout||'')+(e.stderr||'');const lines=out.split('\\n').filter(l=>l.includes('error')||l.includes('warning')).slice(0,10);if(lines.length)console.error(lines.join('\\n'))}}}catch{}console.log(d)})\""
           }
         ],
         "description": "C++20 syntax check after editing .cpp/.cc/.cxx files"
       },
       {
-        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(cpp|hpp|cc|h|cxx|hxx)$\"",
+        "matcher": "Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');const lines=c.split('\\n');const matches=[];lines.forEach((l,idx)=>{if(/\\bstd::cout\\b|\\bprintf\\s*\\(|\\bfprintf\\s*\\(\\s*stderr/.test(l))matches.push((idx+1)+': '+l.trim())});if(matches.length){console.error('[Hook] WARNING: Debug output found in '+p);matches.slice(0,5).forEach(m=>console.error(m));console.error('[Hook] Remove std::cout/printf/fprintf(stderr before committing')}}console.log(d)})\""
+            "command": "node -e \"const fs=require('fs');let d='';const MAX=1024*1024;process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{if(d.length<MAX){d+=c.substring(0,MAX-d.length)}});process.stdin.on('end',()=>{try{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&/\\.(cpp|hpp|cc|h|cxx|hxx)$/.test(p)&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');const lines=c.split('\\n');const matches=[];lines.forEach((l,idx)=>{if(/\\bstd::cout\\b|\\bprintf\\s*\\(|\\bfprintf\\s*\\(\\s*stderr/.test(l))matches.push((idx+1)+': '+l.trim())});if(matches.length){console.error('[Hook] WARNING: Debug output found in '+p);matches.slice(0,5).forEach(m=>console.error(m));console.error('[Hook] Remove std::cout/printf/fprintf(stderr before committing')}}}catch{}console.log(d)})\""
           }
         ],
         "description": "Warn about debug output statements (std::cout/printf/fprintf) after edits"
