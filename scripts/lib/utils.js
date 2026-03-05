@@ -50,10 +50,20 @@ function getTempDir() {
 
 /**
  * Ensure a directory exists (create if not)
+ * @param {string} dirPath - Directory path to create
+ * @returns {string} The directory path
+ * @throws {Error} If directory cannot be created (e.g., permission denied)
  */
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (err) {
+    // EEXIST is fine (race condition with another process creating it)
+    if (err.code !== 'EEXIST') {
+      throw new Error(`Failed to create directory '${dirPath}': ${err.message}`);
+    }
   }
   return dirPath;
 }
@@ -130,6 +140,9 @@ function getDateTimeString() {
  * @param {object} options - Options { maxAge: days, recursive: boolean }
  */
 function findFiles(dir, pattern, options = {}) {
+  if (!dir || typeof dir !== 'string') return [];
+  if (!pattern || typeof pattern !== 'string') return [];
+
   const { maxAge = null, recursive = false } = options;
   const results = [];
 
@@ -137,8 +150,10 @@ function findFiles(dir, pattern, options = {}) {
     return results;
   }
 
+  // Escape all regex special characters, then convert glob wildcards.
+  // Order matters: escape specials first, then convert * and ? to regex equivalents.
   const regexPattern = pattern
-    .replace(/\./g, '\\.')
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
   const regex = new RegExp(`^${regexPattern}$`);
@@ -151,14 +166,19 @@ function findFiles(dir, pattern, options = {}) {
         const fullPath = path.join(currentDir, entry.name);
 
         if (entry.isFile() && regex.test(entry.name)) {
+          let stats;
+          try {
+            stats = fs.statSync(fullPath);
+          } catch {
+            continue; // File deleted between readdir and stat
+          }
+
           if (maxAge !== null) {
-            const stats = fs.statSync(fullPath);
             const ageInDays = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60 * 24);
             if (ageInDays <= maxAge) {
               results.push({ path: fullPath, mtime: stats.mtimeMs });
             }
           } else {
-            const stats = fs.statSync(fullPath);
             results.push({ path: fullPath, mtime: stats.mtimeMs });
           }
         } else if (entry.isDirectory() && recursive) {
@@ -180,29 +200,62 @@ function findFiles(dir, pattern, options = {}) {
 
 /**
  * Read JSON from stdin (for hook input)
+ * @param {object} options - Options
+ * @param {number} options.timeoutMs - Timeout in milliseconds (default: 5000).
+ *   Prevents hooks from hanging indefinitely if stdin never closes.
+ * @returns {Promise<object>} Parsed JSON object, or empty object if stdin is empty
  */
-async function readStdinJson() {
-  return new Promise((resolve, reject) => {
+async function readStdinJson(options = {}) {
+  const { timeoutMs = 5000, maxSize = 1024 * 1024 } = options;
+
+  return new Promise((resolve) => {
     let data = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        // Clean up stdin listeners so the event loop can exit
+        process.stdin.removeAllListeners('data');
+        process.stdin.removeAllListeners('end');
+        process.stdin.removeAllListeners('error');
+        if (process.stdin.unref) process.stdin.unref();
+        // Resolve with whatever we have so far rather than hanging
+        try {
+          resolve(data.trim() ? JSON.parse(data) : {});
+        } catch {
+          resolve({});
+        }
+      }
+    }, timeoutMs);
 
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => {
-      data += chunk;
-    });
-
-    process.stdin.on('end', () => {
-      try {
-        if (data.trim()) {
-          resolve(JSON.parse(data));
-        } else {
-          resolve({});
-        }
-      } catch (err) {
-        reject(err);
+      if (data.length < maxSize) {
+        data += chunk;
       }
     });
 
-    process.stdin.on('error', reject);
+    process.stdin.on('end', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        resolve(data.trim() ? JSON.parse(data) : {});
+      } catch {
+        // Consistent with timeout path: resolve with empty object
+        // so hooks don't crash on malformed input
+        resolve({});
+      }
+    });
+
+    process.stdin.on('error', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // Resolve with empty object so hooks don't crash on stdin errors
+      resolve({});
+    });
   });
 }
 
@@ -306,7 +359,10 @@ function isGitRepo() {
 }
 
 /**
- * Get git modified files
+ * Get git modified files, optionally filtered by regex patterns
+ * @param {string[]} patterns - Array of regex pattern strings to filter files.
+ *   Invalid patterns are silently skipped.
+ * @returns {string[]} Array of modified file paths
  */
 function getGitModifiedFiles(patterns = []) {
   if (!isGitRepo()) return [];
@@ -317,12 +373,19 @@ function getGitModifiedFiles(patterns = []) {
   let files = result.output.split('\n').filter(Boolean);
 
   if (patterns.length > 0) {
-    files = files.filter(file => {
-      return patterns.some(pattern => {
-        const regex = new RegExp(pattern);
-        return regex.test(file);
-      });
-    });
+    // Pre-compile patterns, skipping invalid ones
+    const compiled = [];
+    for (const pattern of patterns) {
+      if (typeof pattern !== 'string' || pattern.length === 0) continue;
+      try {
+        compiled.push(new RegExp(pattern));
+      } catch {
+        // Skip invalid regex patterns
+      }
+    }
+    if (compiled.length > 0) {
+      files = files.filter(file => compiled.some(regex => regex.test(file)));
+    }
   }
 
   return files;
@@ -330,24 +393,59 @@ function getGitModifiedFiles(patterns = []) {
 
 /**
  * Replace text in a file (cross-platform sed alternative)
+ * @param {string} filePath - Path to the file
+ * @param {string|RegExp} search - Pattern to search for. String patterns replace
+ *   the FIRST occurrence only; use a RegExp with the `g` flag for global replacement.
+ * @param {string} replace - Replacement string
+ * @param {object} options - Options
+ * @param {boolean} options.all - When true and search is a string, replaces ALL
+ *   occurrences (uses String.replaceAll). Ignored for RegExp patterns.
+ * @returns {boolean} true if file was written, false on error
  */
-function replaceInFile(filePath, search, replace) {
+function replaceInFile(filePath, search, replace, options = {}) {
   const content = readFile(filePath);
   if (content === null) return false;
 
-  const newContent = content.replace(search, replace);
-  writeFile(filePath, newContent);
-  return true;
+  try {
+    let newContent;
+    if (options.all && typeof search === 'string') {
+      newContent = content.replaceAll(search, replace);
+    } else {
+      newContent = content.replace(search, replace);
+    }
+    writeFile(filePath, newContent);
+    return true;
+  } catch (err) {
+    log(`[Utils] replaceInFile failed for ${filePath}: ${err.message}`);
+    return false;
+  }
 }
 
 /**
  * Count occurrences of a pattern in a file
+ * @param {string} filePath - Path to the file
+ * @param {string|RegExp} pattern - Pattern to count. Strings are treated as
+ *   global regex patterns. RegExp instances are used as-is but the global
+ *   flag is enforced to ensure correct counting.
+ * @returns {number} Number of matches found
  */
 function countInFile(filePath, pattern) {
   const content = readFile(filePath);
   if (content === null) return 0;
 
-  const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern, 'g');
+  let regex;
+  try {
+    if (pattern instanceof RegExp) {
+      // Always create new RegExp to avoid shared lastIndex state; ensure global flag
+      regex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
+    } else if (typeof pattern === 'string') {
+      regex = new RegExp(pattern, 'g');
+    } else {
+      return 0;
+    }
+  } catch {
+    return 0; // Invalid regex pattern
+  }
   const matches = content.match(regex);
   return matches ? matches.length : 0;
 }
@@ -359,7 +457,20 @@ function grepFile(filePath, pattern) {
   const content = readFile(filePath);
   if (content === null) return [];
 
-  const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
+  let regex;
+  try {
+    if (pattern instanceof RegExp) {
+      // Always create a new RegExp without the 'g' flag to prevent lastIndex
+      // state issues when using .test() in a loop (g flag makes .test() stateful,
+      // causing alternating match/miss on consecutive matching lines)
+      const flags = pattern.flags.replace('g', '');
+      regex = new RegExp(pattern.source, flags);
+    } else {
+      regex = new RegExp(pattern);
+    }
+  } catch {
+    return []; // Invalid regex pattern
+  }
   const lines = content.split('\n');
   const results = [];
 

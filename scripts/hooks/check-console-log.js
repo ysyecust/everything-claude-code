@@ -1,78 +1,71 @@
 #!/usr/bin/env node
 
 /**
- * Stop Hook: Check for debug output statements in modified files
+ * Stop Hook: Check for console.log statements in modified files
  *
- * This hook runs after each response and checks if any modified
- * C++/JavaScript files contain debug output statements.
- * It provides warnings to help developers remember to remove
- * debug statements before committing.
+ * Cross-platform (Windows, macOS, Linux)
  *
- * C++ patterns: std::cout, std::cerr, printf, fprintf(stderr, ...)
- * JS patterns: console.log
+ * Runs after each response and checks if any modified JavaScript/TypeScript
+ * files contain console.log statements. Provides warnings to help developers
+ * remember to remove debug statements before committing.
+ *
+ * Exclusions: test files, config files, and scripts/ directory (where
+ * console.log is often intentional).
  */
 
-const { execSync } = require('child_process');
 const fs = require('fs');
+const { isGitRepo, getGitModifiedFiles, readFile, log } = require('../lib/utils');
 
+// Files where console.log is expected and should not trigger warnings
+const EXCLUDED_PATTERNS = [
+  /\.test\.[jt]sx?$/,
+  /\.spec\.[jt]sx?$/,
+  /\.config\.[jt]s$/,
+  /scripts\//,
+  /__tests__\//,
+  /__mocks__\//,
+];
+
+const MAX_STDIN = 1024 * 1024; // 1MB limit
 let data = '';
+process.stdin.setEncoding('utf8');
 
-// Read stdin
 process.stdin.on('data', chunk => {
-  data += chunk;
+  if (data.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - data.length;
+    data += chunk.substring(0, remaining);
+  }
 });
 
 process.stdin.on('end', () => {
   try {
-    // Check if we're in a git repository
-    try {
-      execSync('git rev-parse --git-dir', { stdio: 'pipe' });
-    } catch {
-      // Not in a git repo, just pass through the data
-      console.log(data);
+    if (!isGitRepo()) {
+      process.stdout.write(data);
       process.exit(0);
     }
 
-    // Get list of modified files
-    const files = execSync('git diff --name-only HEAD', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
-      .split('\n')
-      .filter(f => /\.(cpp|cc|cxx|hpp|h|ts|tsx|js|jsx)$/.test(f) && fs.existsSync(f));
+    const files = getGitModifiedFiles(['\\.tsx?$', '\\.jsx?$'])
+      .filter(f => fs.existsSync(f))
+      .filter(f => !EXCLUDED_PATTERNS.some(pattern => pattern.test(f)));
 
-    let hasDebugOutput = false;
+    let hasConsole = false;
 
-    // Check each file for debug output
     for (const file of files) {
-      const content = fs.readFileSync(file, 'utf8');
-      const isCpp = /\.(cpp|cc|cxx|hpp|h)$/.test(file);
-      const isJs = /\.(ts|tsx|js|jsx)$/.test(file);
-
-      if (isCpp) {
-        // Check for C++ debug output patterns
-        if (/\bstd::cout\b/.test(content) || /\bprintf\s*\(/.test(content) || /\bfprintf\s*\(\s*stderr/.test(content)) {
-          console.error(`[Hook] WARNING: debug output (std::cout/printf) found in ${file}`);
-          hasDebugOutput = true;
-        }
-      }
-
-      if (isJs) {
-        // Check for JS debug output patterns
-        if (content.includes('console.log')) {
-          console.error(`[Hook] WARNING: console.log found in ${file}`);
-          hasDebugOutput = true;
-        }
+      const content = readFile(file);
+      if (content && content.includes('console.log')) {
+        log(`[Hook] WARNING: console.log found in ${file}`);
+        hasConsole = true;
       }
     }
 
-    if (hasDebugOutput) {
-      console.error('[Hook] Remove debug output statements before committing');
+    if (hasConsole) {
+      log('[Hook] Remove console.log statements before committing');
     }
-  } catch (_error) {
-    // Silently ignore errors (git might not be available, etc.)
+  } catch (err) {
+    log(`[Hook] check-console-log error: ${err.message}`);
   }
 
   // Always output the original data
-  console.log(data);
+  process.stdout.write(data);
+  process.exit(0);
 });

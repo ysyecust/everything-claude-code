@@ -27,7 +27,14 @@ function validateSkills() {
       continue;
     }
 
-    const content = fs.readFileSync(skillMd, 'utf-8');
+    let content;
+    try {
+      content = fs.readFileSync(skillMd, 'utf-8');
+    } catch (err) {
+      console.error(`ERROR: ${dir}/SKILL.md - ${err.message}`);
+      hasErrors = true;
+      continue;
+    }
     if (content.trim().length === 0) {
       console.error(`ERROR: ${dir}/SKILL.md - Empty file`);
       hasErrors = true;

@@ -1,12 +1,12 @@
 ---
 name: instinct-status
-description: Show all learned instincts with their confidence levels
+description: Show learned instincts (project + global) with confidence
 command: true
 ---
 
 # Instinct Status Command
 
-Shows all learned instincts with their confidence scores, grouped by domain.
+Shows learned instincts for the current project plus global instincts, grouped by domain.
 
 ## Implementation
 
@@ -26,20 +26,34 @@ python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
 
 ```
 /instinct-status
-/instinct-status --domain code-style
-/instinct-status --low-confidence
 ```
 
 ## What to Do
 
-1. Read all instinct files from `~/.claude/homunculus/instincts/personal/`
-2. Read inherited instincts from `~/.claude/homunculus/instincts/inherited/`
-3. Display them grouped by domain with confidence bars
+1. Detect current project context (git remote/path hash)
+2. Read project instincts from `~/.claude/homunculus/projects/<project-id>/instincts/`
+3. Read global instincts from `~/.claude/homunculus/instincts/`
+4. Merge with precedence rules (project overrides global when IDs collide)
+5. Display grouped by domain with confidence bars and observation stats
 
-## Flags
+## Output Format
 
-- `--domain <name>`: Filter by domain (code-style, testing, git, etc.)
-- `--low-confidence`: Show only instincts with confidence < 0.5
-- `--high-confidence`: Show only instincts with confidence >= 0.7
-- `--source <type>`: Filter by source (session-observation, repo-analysis, inherited)
-- `--json`: Output as JSON for programmatic use
+```
+============================================================
+  INSTINCT STATUS - 12 total
+============================================================
+
+  Project: my-app (a1b2c3d4e5f6)
+  Project instincts: 8
+  Global instincts:  4
+
+## PROJECT-SCOPED (my-app)
+  ### WORKFLOW (3)
+    ███████░░░  70%  grep-before-edit [project]
+              trigger: when modifying code
+
+## GLOBAL (apply to all projects)
+  ### SECURITY (2)
+    █████████░  85%  validate-user-input [global]
+              trigger: when handling user input
+```

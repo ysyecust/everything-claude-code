@@ -7,6 +7,18 @@
 ![Go](https://img.shields.io/badge/-Go-00ADD8?logo=go&logoColor=white)
 ![Markdown](https://img.shields.io/badge/-Markdown-000000?logo=markdown&logoColor=white)
 
+---
+
+<div align="center">
+
+**🌐 Language / 语言 / 語言**
+
+[**English**](../../README.md) | [简体中文](../../README.zh-CN.md) | [繁體中文](README.md) | [日本語](../../docs/ja-JP/README.md)
+
+</div>
+
+---
+
 **來自 Anthropic 黑客松冠軍的完整 Claude Code 設定集合。**
 
 經過 10 個月以上密集日常使用、打造真實產品所淬煉出的生產就緒代理程式、技能、鉤子、指令、規則和 MCP 設定。
@@ -47,7 +59,50 @@
 
 ---
 
-## 跨平台支援
+## 🚀 快速開始
+
+在 2 分鐘內快速上手：
+
+### 第一步：安裝外掛程式
+
+```bash
+# 新增市集
+/plugin marketplace add affaan-m/everything-claude-code
+
+# 安裝外掛程式
+/plugin install everything-claude-code@everything-claude-code
+```
+
+### 第二步：安裝規則（必需）
+
+> ⚠️ **重要提示：** Claude Code 外掛程式無法自動分發 `rules`，需要手動安裝：
+
+```bash
+# 首先複製儲存庫
+git clone https://github.com/affaan-m/everything-claude-code.git
+
+# 複製規則（應用於所有專案）
+cp -r everything-claude-code/rules/* ~/.claude/rules/
+```
+
+### 第三步：開始使用
+
+```bash
+# 嘗試一個指令（外掛安裝使用命名空間形式）
+/everything-claude-code:plan "新增使用者認證"
+
+# 手動安裝（選項2）使用簡短形式：
+# /plan "新增使用者認證"
+
+# 查看可用指令
+/plugin list everything-claude-code@everything-claude-code
+```
+
+✨ **完成！** 您現在使用 15+ 代理程式、30+ 技能和 20+ 指令。
+
+---
+
+## 🌐 跨平台支援
 
 此外掛程式現已完整支援 **Windows、macOS 和 Linux**。所有鉤子和腳本已使用 Node.js 重寫以獲得最佳相容性。
 
@@ -82,7 +137,7 @@ node scripts/setup-package-manager.js --detect
 
 ---
 
-## 內容概覽
+## 📦 內容概覽
 
 本儲存庫是一個 **Claude Code 外掛程式** - 可直接安裝或手動複製元件。
 
@@ -182,7 +237,7 @@ everything-claude-code/
 
 ---
 
-## 生態系統工具
+## 🛠️ 生態系統工具
 
 ### ecc.tools - 技能建立器
 
@@ -204,7 +259,7 @@ everything-claude-code/
 
 ---
 
-## 安裝
+## 📥 安裝
 
 ### 選項 1：以外掛程式安裝（建議）
 
@@ -240,7 +295,7 @@ everything-claude-code/
 
 ---
 
-### 選項 2：手動安裝
+### 🔧 選項 2：手動安裝
 
 如果您偏好手動控制安裝內容：
 
@@ -273,7 +328,7 @@ cp -r everything-claude-code/skills/* ~/.claude/skills/
 
 ---
 
-## 核心概念
+## 🎯 核心概念
 
 ### 代理程式（Agents）
 
@@ -331,7 +386,7 @@ You are a senior code reviewer...
 
 ---
 
-## 執行測試
+## 🧪 執行測試
 
 外掛程式包含完整的測試套件：
 
@@ -347,7 +402,7 @@ node tests/hooks/hooks.test.js
 
 ---
 
-## 貢獻
+## 🤝 貢獻
 
 **歡迎並鼓勵貢獻。**
 
@@ -369,7 +424,7 @@ node tests/hooks/hooks.test.js
 
 ---
 
-## 背景
+## 📖 背景
 
 我從實驗性推出就開始使用 Claude Code。2025 年 9 月與 [@DRodriguezFX](https://x.com/DRodriguezFX) 一起使用 Claude Code 打造 [zenith.chat](https://zenith.chat)，贏得了 Anthropic x Forum Ventures 黑客松。
 
@@ -377,7 +432,7 @@ node tests/hooks/hooks.test.js
 
 ---
 
-## 重要注意事項
+## ⚠️ 重要注意事項
 
 ### 上下文視窗管理
 
@@ -400,22 +455,23 @@ node tests/hooks/hooks.test.js
 
 ---
 
-## Star 歷史
+## 🌟 Star 歷史
 
 [![Star History Chart](https://api.star-history.com/svg?repos=affaan-m/everything-claude-code&type=Date)](https://star-history.com/#affaan-m/everything-claude-code&Date)
 
 ---
 
-## 連結
+## 🔗 連結
 
 - **簡明指南（從這裡開始）：** [Everything Claude Code 簡明指南](https://x.com/affaanmustafa/status/2012378465664745795)
 - **完整指南（進階）：** [Everything Claude Code 完整指南](https://x.com/affaanmustafa/status/2014040193557471352)
 - **追蹤：** [@affaanmustafa](https://x.com/affaanmustafa)
 - **zenith.chat：** [zenith.chat](https://zenith.chat)
+- **技能目錄：** awesome-agent-skills（社區維護的智能體技能目錄）
 
 ---
 
-## 授權
+## 📄 授權
 
 MIT - 自由使用、依需求修改、如可能請回饋貢獻。
 

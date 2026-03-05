@@ -3,6 +3,7 @@
  * Skill Creator - Pretty Output Formatter
  *
  * Creates beautiful terminal output for the /skill-create command
+ * similar to @mvanhorn's /last30days skill
  */
 
 // ANSI color codes - no external dependencies
@@ -21,26 +22,26 @@ const chalk = {
 
 // Box drawing characters
 const BOX = {
-  topLeft: '\u256d',
-  topRight: '\u256e',
-  bottomLeft: '\u2570',
-  bottomRight: '\u256f',
-  horizontal: '\u2500',
-  vertical: '\u2502',
-  verticalRight: '\u251c',
-  verticalLeft: '\u2524',
+  topLeft: '╭',
+  topRight: '╮',
+  bottomLeft: '╰',
+  bottomRight: '╯',
+  horizontal: '─',
+  vertical: '│',
+  verticalRight: '├',
+  verticalLeft: '┤',
 };
 
 // Progress spinner frames
-const SPINNER = ['\u280b', '\u2819', '\u2839', '\u2838', '\u283c', '\u2834', '\u2826', '\u2827', '\u2807', '\u280f'];
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 // Helper functions
 function box(title, content, width = 60) {
   const lines = content.split('\n');
-  const top = `${BOX.topLeft}${BOX.horizontal} ${chalk.bold(chalk.cyan(title))} ${BOX.horizontal.repeat(width - title.length - 5)}${BOX.topRight}`;
-  const bottom = `${BOX.bottomLeft}${BOX.horizontal.repeat(width - 1)}${BOX.bottomRight}`;
+  const top = `${BOX.topLeft}${BOX.horizontal} ${chalk.bold(chalk.cyan(title))} ${BOX.horizontal.repeat(Math.max(0, width - title.length - 5))}${BOX.topRight}`;
+  const bottom = `${BOX.bottomLeft}${BOX.horizontal.repeat(width - 2)}${BOX.bottomRight}`;
   const middle = lines.map(line => {
-    const padding = width - 3 - stripAnsi(line).length;
+    const padding = width - 4 - stripAnsi(line).length;
     return `${BOX.vertical} ${line}${' '.repeat(Math.max(0, padding))} ${BOX.vertical}`;
   }).join('\n');
   return `${top}\n${middle}\n${bottom}`;
@@ -52,9 +53,9 @@ function stripAnsi(str) {
 }
 
 function progressBar(percent, width = 30) {
-  const filled = Math.round(width * percent / 100);
+  const filled = Math.min(width, Math.max(0, Math.round(width * percent / 100)));
   const empty = width - filled;
-  const bar = chalk.green('\u2588'.repeat(filled)) + chalk.gray('\u2591'.repeat(empty));
+  const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
   return `${bar} ${chalk.bold(percent)}%`;
 }
 
@@ -63,7 +64,7 @@ function sleep(ms) {
 }
 
 async function animateProgress(label, steps, callback) {
-  process.stdout.write(`\n${chalk.cyan('\u23f3')} ${label}...\n`);
+  process.stdout.write(`\n${chalk.cyan('⏳')} ${label}...\n`);
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -71,7 +72,7 @@ async function animateProgress(label, steps, callback) {
     await sleep(step.duration || 500);
     process.stdout.clearLine?.(0) || process.stdout.write('\r');
     process.stdout.cursorTo?.(0) || process.stdout.write('\r');
-    process.stdout.write(`   ${chalk.green('\u2713')} ${step.name}\n`);
+    process.stdout.write(`   ${chalk.green('✓')} ${step.name}\n`);
     if (callback) callback(step, i);
   }
 }
@@ -88,10 +89,10 @@ class SkillCreateOutput {
     const subtitle = `Extracting patterns from ${chalk.cyan(this.repoName)}`;
 
     console.log('\n');
-    console.log(chalk.bold(chalk.magenta('\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557')));
-    console.log(chalk.bold(chalk.magenta('\u2551')) + chalk.bold('  ECC Skill Creator                                              ') + chalk.bold(chalk.magenta('\u2551')));
-    console.log(chalk.bold(chalk.magenta('\u2551')) + `     ${subtitle}${' '.repeat(Math.max(0, 55 - stripAnsi(subtitle).length))}` + chalk.bold(chalk.magenta('\u2551')));
-    console.log(chalk.bold(chalk.magenta('\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d')));
+    console.log(chalk.bold(chalk.magenta('╔════════════════════════════════════════════════════════════════╗')));
+    console.log(chalk.bold(chalk.magenta('║')) + chalk.bold('  🔮 ECC Skill Creator                                          ') + chalk.bold(chalk.magenta('║')));
+    console.log(chalk.bold(chalk.magenta('║')) + `     ${subtitle}${' '.repeat(Math.max(0, 59 - stripAnsi(subtitle).length))}` + chalk.bold(chalk.magenta('║')));
+    console.log(chalk.bold(chalk.magenta('╚════════════════════════════════════════════════════════════════╝')));
     console.log('');
   }
 
@@ -110,7 +111,7 @@ class SkillCreateOutput {
 
   analysisResults(data) {
     console.log('\n');
-    console.log(box('Analysis Results', `
+    console.log(box('📊 Analysis Results', `
 ${chalk.bold('Commits Analyzed:')} ${chalk.yellow(data.commits)}
 ${chalk.bold('Time Range:')}       ${chalk.gray(data.timeRange)}
 ${chalk.bold('Contributors:')}     ${chalk.cyan(data.contributors)}
@@ -120,11 +121,11 @@ ${chalk.bold('Files Tracked:')}    ${chalk.green(data.files)}
 
   patterns(patterns) {
     console.log('\n');
-    console.log(chalk.bold(chalk.cyan('Key Patterns Discovered:')));
-    console.log(chalk.gray('\u2500'.repeat(50)));
+    console.log(chalk.bold(chalk.cyan('🔍 Key Patterns Discovered:')));
+    console.log(chalk.gray('─'.repeat(50)));
 
     patterns.forEach((pattern, i) => {
-      const confidence = pattern.confidence || 0.8;
+      const confidence = pattern.confidence ?? 0.8;
       const confidenceBar = progressBar(Math.round(confidence * 100), 15);
       console.log(`
   ${chalk.bold(chalk.yellow(`${i + 1}.`))} ${chalk.bold(pattern.name)}
@@ -136,26 +137,26 @@ ${chalk.bold('Files Tracked:')}    ${chalk.green(data.files)}
 
   instincts(instincts) {
     console.log('\n');
-    console.log(box('Instincts Generated', instincts.map((inst, i) =>
+    console.log(box('🧠 Instincts Generated', instincts.map((inst, i) =>
       `${chalk.yellow(`${i + 1}.`)} ${chalk.bold(inst.name)} ${chalk.gray(`(${Math.round(inst.confidence * 100)}%)`)}`
     ).join('\n')));
   }
 
   output(skillPath, instinctsPath) {
     console.log('\n');
-    console.log(chalk.bold(chalk.green('Generation Complete!')));
-    console.log(chalk.gray('\u2500'.repeat(50)));
+    console.log(chalk.bold(chalk.green('✨ Generation Complete!')));
+    console.log(chalk.gray('─'.repeat(50)));
     console.log(`
-  ${chalk.green('>')} ${chalk.bold('Skill File:')}
+  ${chalk.green('📄')} ${chalk.bold('Skill File:')}
      ${chalk.cyan(skillPath)}
 
-  ${chalk.green('>')} ${chalk.bold('Instincts File:')}
+  ${chalk.green('🧠')} ${chalk.bold('Instincts File:')}
      ${chalk.cyan(instinctsPath)}
 `);
   }
 
   nextSteps() {
-    console.log(box('Next Steps', `
+    console.log(box('📋 Next Steps', `
 ${chalk.yellow('1.')} Review the generated SKILL.md
 ${chalk.yellow('2.')} Import instincts: ${chalk.cyan('/instinct-import <path>')}
 ${chalk.yellow('3.')} View learned patterns: ${chalk.cyan('/instinct-status')}
@@ -165,15 +166,16 @@ ${chalk.yellow('4.')} Evolve into skills: ${chalk.cyan('/evolve')}
   }
 
   footer() {
-    console.log(chalk.gray('\u2500'.repeat(60)));
-    console.log(chalk.dim(`  Powered by Everything Claude Code`));
+    console.log(chalk.gray('─'.repeat(60)));
+    console.log(chalk.dim(`  Powered by Everything Claude Code • ecc.tools`));
+    console.log(chalk.dim(`  GitHub App: github.com/apps/skill-creator`));
     console.log('\n');
   }
 }
 
 // Demo function to show the output
 async function demo() {
-  const output = new SkillCreateOutput('my-hpc-project');
+  const output = new SkillCreateOutput('PMX');
 
   output.header();
 
@@ -183,7 +185,7 @@ async function demo() {
 
   output.analysisResults({
     commits: 200,
-    timeRange: 'Nov 2025 - Jan 2026',
+    timeRange: 'Nov 2024 - Jan 2025',
     contributors: 4,
     files: 847,
   });
@@ -196,37 +198,37 @@ async function demo() {
       evidence: 'Found in 150/200 commits (feat:, fix:, refactor:)',
     },
     {
-      name: 'RAII Resource Management',
-      trigger: 'when allocating resources',
+      name: 'Client/Server Component Split',
+      trigger: 'when creating Next.js pages',
       confidence: 0.90,
-      evidence: 'Observed in core/, solvers/, io/',
+      evidence: 'Observed in markets/, premarkets/, portfolio/',
     },
     {
-      name: 'Cache-Friendly Data Layout',
-      trigger: 'when designing data structures',
+      name: 'Service Layer Architecture',
+      trigger: 'when adding backend logic',
       confidence: 0.85,
-      evidence: 'SoA patterns in particle_system.hpp, mesh.hpp',
+      evidence: 'Business logic in services/, not routes/',
     },
     {
-      name: 'TDD with Google Test',
+      name: 'TDD with E2E Tests',
       trigger: 'when adding features',
       confidence: 0.75,
-      evidence: '42 test files, test(unit) commits common',
+      evidence: '9 E2E test files, test(e2e) commits common',
     },
   ]);
 
   output.instincts([
-    { name: 'project-conventional-commits', confidence: 0.85 },
-    { name: 'project-raii-pattern', confidence: 0.90 },
-    { name: 'project-soa-layout', confidence: 0.85 },
-    { name: 'project-gtest-location', confidence: 0.90 },
-    { name: 'project-cmake-targets', confidence: 0.95 },
-    { name: 'project-hot-path-caution', confidence: 0.90 },
+    { name: 'pmx-conventional-commits', confidence: 0.85 },
+    { name: 'pmx-client-component-pattern', confidence: 0.90 },
+    { name: 'pmx-service-layer', confidence: 0.85 },
+    { name: 'pmx-e2e-test-location', confidence: 0.90 },
+    { name: 'pmx-package-manager', confidence: 0.95 },
+    { name: 'pmx-hot-path-caution', confidence: 0.90 },
   ]);
 
   output.output(
-    '.claude/skills/project-patterns/SKILL.md',
-    '.claude/homunculus/instincts/inherited/project-instincts.yaml'
+    '.claude/skills/pmx-patterns/SKILL.md',
+    '.claude/homunculus/instincts/inherited/pmx-instincts.yaml'
   );
 
   output.nextSteps();

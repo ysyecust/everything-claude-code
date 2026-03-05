@@ -4,7 +4,8 @@
  *
  * Cross-platform (Windows, macOS, Linux)
  *
- * Runs on Stop hook to extract reusable patterns from Claude Code sessions
+ * Runs on Stop hook to extract reusable patterns from Claude Code sessions.
+ * Reads transcript_path from stdin JSON (Claude Code hook input).
  *
  * Why Stop hook instead of UserPromptSubmit:
  * - Stop runs once at session end (lightweight)
@@ -21,7 +22,36 @@ const {
   log
 } = require('../lib/utils');
 
+// Read hook input from stdin (Claude Code provides transcript_path via stdin JSON)
+const MAX_STDIN = 1024 * 1024;
+let stdinData = '';
+process.stdin.setEncoding('utf8');
+
+process.stdin.on('data', chunk => {
+  if (stdinData.length < MAX_STDIN) {
+    const remaining = MAX_STDIN - stdinData.length;
+    stdinData += chunk.substring(0, remaining);
+  }
+});
+
+process.stdin.on('end', () => {
+  main().catch(err => {
+    console.error('[ContinuousLearning] Error:', err.message);
+    process.exit(0);
+  });
+});
+
 async function main() {
+  // Parse stdin JSON to get transcript_path
+  let transcriptPath = null;
+  try {
+    const input = JSON.parse(stdinData);
+    transcriptPath = input.transcript_path;
+  } catch {
+    // Fallback: try env var for backwards compatibility
+    transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
+  }
+
   // Get script directory to find config
   const scriptDir = __dirname;
   const configFile = path.join(scriptDir, '..', '..', 'skills', 'continuous-learning', 'config.json');
@@ -35,29 +65,26 @@ async function main() {
   if (configContent) {
     try {
       const config = JSON.parse(configContent);
-      minSessionLength = config.min_session_length || 10;
+      minSessionLength = config.min_session_length ?? 10;
 
       if (config.learned_skills_path) {
         // Handle ~ in path
         learnedSkillsPath = config.learned_skills_path.replace(/^~/, require('os').homedir());
       }
-    } catch {
-      // Invalid config, use defaults
+    } catch (err) {
+      log(`[ContinuousLearning] Failed to parse config: ${err.message}, using defaults`);
     }
   }
 
   // Ensure learned skills directory exists
   ensureDir(learnedSkillsPath);
 
-  // Get transcript path from environment (set by Claude Code)
-  const transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH;
-
   if (!transcriptPath || !fs.existsSync(transcriptPath)) {
     process.exit(0);
   }
 
-  // Count user messages in session
-  const messageCount = countInFile(transcriptPath, /"type":"user"/g);
+  // Count user messages in session (allow optional whitespace around colon)
+  const messageCount = countInFile(transcriptPath, /"type"\s*:\s*"user"/g);
 
   // Skip short sessions
   if (messageCount < minSessionLength) {
@@ -71,8 +98,3 @@ async function main() {
 
   process.exit(0);
 }
-
-main().catch(err => {
-  console.error('[ContinuousLearning] Error:', err.message);
-  process.exit(0);
-});

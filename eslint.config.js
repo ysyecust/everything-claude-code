@@ -2,6 +2,9 @@ const js = require('@eslint/js');
 const globals = require('globals');
 
 module.exports = [
+    {
+        ignores: ['.opencode/dist/**', '.cursor/**', 'node_modules/**']
+    },
     js.configs.recommended,
     {
         languageOptions: {

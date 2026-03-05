@@ -139,6 +139,7 @@ Plugins package tools for easy installation instead of tedious manual setup. A p
 
 ```bash
 # Add a marketplace
+# mgrep plugin by @mixedbread-ai
 claude plugin marketplace add https://github.com/mixedbread-ai/mgrep
 
 # Open Claude, run /plugins, find new marketplace, install from there

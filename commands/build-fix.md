@@ -1,46 +1,62 @@
----
-description: Incrementally fix C++20/CMake build errors. Parses compiler output, diagnoses root cause, and applies minimal surgical fixes one at a time.
----
+# Build and Fix
 
-# Build Fix
+Incrementally fix build and type errors with minimal, safe changes.
 
-Incrementally fix C++20/CMake build errors:
+## Step 1: Detect Build System
 
-1. Run build: `cmake --build build 2>&1 | head -50`
+Identify the project's build tool and run the build:
 
-2. Parse error output:
-   - Group by file
-   - Categorize: CMake config, linker, template, concept, include, C++20 feature
-   - Sort by severity (first error causes cascade)
+| Indicator | Build Command |
+|-----------|---------------|
+| `package.json` with `build` script | `npm run build` or `pnpm build` |
+| `tsconfig.json` (TypeScript only) | `npx tsc --noEmit` |
+| `Cargo.toml` | `cargo build 2>&1` |
+| `pom.xml` | `mvn compile` |
+| `build.gradle` | `./gradlew compileJava` |
+| `go.mod` | `go build ./...` |
+| `pyproject.toml` | `python -m py_compile` or `mypy .` |
 
-3. For each error (starting from FIRST):
-   - Show error context (5 lines before/after in source)
-   - Identify error category
-   - Explain the issue (template constraints, missing symbols, etc.)
-   - Propose fix
-   - Apply fix
-   - Re-run build: `cmake --build build 2>&1 | head -50`
-   - Verify error resolved
+## Step 2: Parse and Group Errors
 
-4. Stop if:
-   - Fix introduces new errors (revert and try alternative)
-   - Same error persists after 3 attempts
-   - User requests pause
+1. Run the build command and capture stderr
+2. Group errors by file path
+3. Sort by dependency order (fix imports/types before logic errors)
+4. Count total errors for progress tracking
 
-5. If CMake cache is stale:
-   - `rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON`
+## Step 3: Fix Loop (One Error at a Time)
 
-6. Show summary:
-   - Errors fixed (with categories)
-   - Errors remaining
-   - New errors introduced (if any)
+For each error:
 
-Fix one error at a time for safety!
+1. **Read the file** — Use Read tool to see error context (10 lines around the error)
+2. **Diagnose** — Identify root cause (missing import, wrong type, syntax error)
+3. **Fix minimally** — Use Edit tool for the smallest change that resolves the error
+4. **Re-run build** — Verify the error is gone and no new errors introduced
+5. **Move to next** — Continue with remaining errors
 
-## Common C++20/CMake Error Patterns
+## Step 4: Guardrails
 
-- **Missing #include**: `'span' is not a member of 'std'` -> add `#include <span>`
-- **Linker errors**: `undefined reference` -> check target_link_libraries
-- **Concept failures**: `constraints not satisfied` -> verify type requirements
-- **Template errors**: read innermost `note:` for actual cause
-- **CMake find_package**: install dev package or use FetchContent
+Stop and ask the user if:
+- A fix introduces **more errors than it resolves**
+- The **same error persists after 3 attempts** (likely a deeper issue)
+- The fix requires **architectural changes** (not just a build fix)
+- Build errors stem from **missing dependencies** (need `npm install`, `cargo add`, etc.)
+
+## Step 5: Summary
+
+Show results:
+- Errors fixed (with file paths)
+- Errors remaining (if any)
+- New errors introduced (should be zero)
+- Suggested next steps for unresolved issues
+
+## Recovery Strategies
+
+| Situation | Action |
+|-----------|--------|
+| Missing module/import | Check if package is installed; suggest install command |
+| Type mismatch | Read both type definitions; fix the narrower type |
+| Circular dependency | Identify cycle with import graph; suggest extraction |
+| Version conflict | Check `package.json` / `Cargo.toml` for version constraints |
+| Build tool misconfiguration | Read config file; compare with working defaults |
+
+Fix one error at a time for safety. Prefer minimal diffs over refactoring.

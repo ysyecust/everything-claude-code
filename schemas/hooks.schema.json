@@ -11,7 +11,18 @@
       ],
       "properties": {
         "type": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "PreToolUse",
+            "PostToolUse",
+            "PreCompact",
+            "SessionStart",
+            "SessionEnd",
+            "Stop",
+            "Notification",
+            "SubagentStop"
+          ],
+          "description": "Hook event type that triggers this hook"
         },
         "command": {
           "oneOf": [
@@ -25,6 +36,15 @@
               }
             }
           ]
+        },
+        "async": {
+          "type": "boolean",
+          "description": "Run hook asynchronously in background without blocking"
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Timeout in seconds for async hooks"
         }
       }
     },
