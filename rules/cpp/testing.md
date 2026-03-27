@@ -1,4 +1,20 @@
-# Testing Requirements
+---
+paths:
+  - "**/*.cpp"
+  - "**/*.hpp"
+  - "**/*.cc"
+  - "**/*.hh"
+  - "**/*.cxx"
+  - "**/*.h"
+  - "**/CMakeLists.txt"
+---
+# C++ Testing
+
+> This file extends [common/testing.md](../common/testing.md) with C++ specific content.
+
+## Framework
+
+Use **GoogleTest** (gtest/gmock) with **CMake/CTest**.
 
 ## Minimum Test Coverage: 80%
 
@@ -17,7 +33,11 @@ MANDATORY workflow:
 5. Refactor (IMPROVE)
 6. Verify coverage (80%+): `gcov` / `lcov`
 
-## Testing Framework: Google Test + CTest
+## Running Tests
+
+```bash
+cmake --build build && ctest --test-dir build --output-on-failure
+```
 
 ### Build with Tests
 ```bash
@@ -26,7 +46,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-### Coverage Analysis
+## Coverage
+
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
@@ -36,6 +57,14 @@ lcov --capture --directory build --output-file coverage.info
 lcov --remove coverage.info '/usr/*' '*/test/*' --output-file coverage.info
 genhtml coverage.info --output-directory coverage_report
 # Open coverage_report/index.html
+```
+
+## Sanitizers
+
+Always run tests with sanitizers in CI:
+
+```bash
+cmake -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" ..
 ```
 
 ## Troubleshooting Test Failures
@@ -53,3 +82,7 @@ genhtml coverage.info --output-directory coverage_report
 
 - **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first
 - **integration-test-runner** - Multi-process integration testing specialist
+
+## Reference
+
+See skill: `cpp-testing` for detailed C++ testing patterns, TDD workflow, and GoogleTest/GMock usage.

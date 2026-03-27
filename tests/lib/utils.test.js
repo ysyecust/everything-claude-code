@@ -7,6 +7,7 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const { spawnSync } = require('child_process');
 
 // Import the module
 const utils = require('../../scripts/lib/utils');
@@ -68,7 +69,13 @@ function runTests() {
     const sessionsDir = utils.getSessionsDir();
     const claudeDir = utils.getClaudeDir();
     assert.ok(sessionsDir.startsWith(claudeDir), 'Sessions should be under Claude dir');
-    assert.ok(sessionsDir.includes('sessions'), 'Should contain sessions');
+    assert.ok(sessionsDir.endsWith(path.join('.claude', 'session-data')) || sessionsDir.endsWith('/.claude/session-data'), 'Should use canonical session-data directory');
+  })) passed++; else failed++;
+
+  if (test('getSessionSearchDirs includes canonical and legacy paths', () => {
+    const searchDirs = utils.getSessionSearchDirs();
+    assert.strictEqual(searchDirs[0], utils.getSessionsDir(), 'Canonical session dir should be searched first');
+    assert.strictEqual(searchDirs[1], utils.getLegacySessionsDir(), 'Legacy session dir should be searched second');
   })) passed++; else failed++;
 
   if (test('getTempDir returns valid temp directory', () => {
@@ -118,17 +125,94 @@ function runTests() {
     assert.ok(name && name.length > 0);
   })) passed++; else failed++;
 
+  // sanitizeSessionId tests
+  console.log('\nsanitizeSessionId:');
+
+  if (test('sanitizeSessionId strips leading dots', () => {
+    assert.strictEqual(utils.sanitizeSessionId('.claude'), 'claude');
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId replaces dots and spaces', () => {
+    assert.strictEqual(utils.sanitizeSessionId('my.project'), 'my-project');
+    assert.strictEqual(utils.sanitizeSessionId('my project'), 'my-project');
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId replaces special chars and collapses runs', () => {
+    assert.strictEqual(utils.sanitizeSessionId('project@v2'), 'project-v2');
+    assert.strictEqual(utils.sanitizeSessionId('a...b'), 'a-b');
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId preserves valid chars', () => {
+    assert.strictEqual(utils.sanitizeSessionId('my-project_123'), 'my-project_123');
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId appends hash suffix for all Windows reserved device names', () => {
+    for (const reservedName of ['CON', 'prn', 'Aux', 'nul', 'COM1', 'lpt9']) {
+      const sanitized = utils.sanitizeSessionId(reservedName);
+      assert.ok(sanitized, `Expected sanitized output for ${reservedName}`);
+      assert.notStrictEqual(sanitized.toUpperCase(), reservedName.toUpperCase());
+      assert.ok(/-[a-f0-9]{6}$/i.test(sanitized), `Expected deterministic hash suffix for ${reservedName}, got ${sanitized}`);
+    }
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId returns null for empty or punctuation-only values', () => {
+    assert.strictEqual(utils.sanitizeSessionId(''), null);
+    assert.strictEqual(utils.sanitizeSessionId(null), null);
+    assert.strictEqual(utils.sanitizeSessionId(undefined), null);
+    assert.strictEqual(utils.sanitizeSessionId('...'), null);
+    assert.strictEqual(utils.sanitizeSessionId('…'), null);
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId returns stable hashes for non-ASCII values', () => {
+    const chinese = utils.sanitizeSessionId('我的项目');
+    const cyrillic = utils.sanitizeSessionId('проект');
+    const emoji = utils.sanitizeSessionId('🚀🎉');
+    assert.ok(/^[a-f0-9]{8}$/.test(chinese), `Expected 8-char hash, got: ${chinese}`);
+    assert.ok(/^[a-f0-9]{8}$/.test(cyrillic), `Expected 8-char hash, got: ${cyrillic}`);
+    assert.ok(/^[a-f0-9]{8}$/.test(emoji), `Expected 8-char hash, got: ${emoji}`);
+    assert.notStrictEqual(chinese, cyrillic);
+    assert.notStrictEqual(chinese, emoji);
+    assert.strictEqual(utils.sanitizeSessionId('日本語プロジェクト'), utils.sanitizeSessionId('日本語プロジェクト'));
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId disambiguates mixed-script names from pure ASCII', () => {
+    const mixed = utils.sanitizeSessionId('我的app');
+    const mixedTwo = utils.sanitizeSessionId('他的app');
+    const pure = utils.sanitizeSessionId('app');
+    assert.strictEqual(pure, 'app');
+    assert.ok(mixed.startsWith('app-'), `Expected mixed-script prefix, got: ${mixed}`);
+    assert.notStrictEqual(mixed, pure);
+    assert.notStrictEqual(mixed, mixedTwo);
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId is idempotent', () => {
+    for (const input of ['.claude', 'my.project', 'project@v2', 'a...b', 'my-project_123']) {
+      const once = utils.sanitizeSessionId(input);
+      const twice = utils.sanitizeSessionId(once);
+      assert.strictEqual(once, twice, `Expected idempotent result for ${input}`);
+    }
+  })) passed++; else failed++;
+
+  if (test('sanitizeSessionId preserves readable prefixes for Windows reserved device names', () => {
+    const con = utils.sanitizeSessionId('CON');
+    const aux = utils.sanitizeSessionId('aux');
+    assert.ok(con.startsWith('CON-'), `Expected CON to get a suffix, got: ${con}`);
+    assert.ok(aux.startsWith('aux-'), `Expected aux to get a suffix, got: ${aux}`);
+    assert.notStrictEqual(utils.sanitizeSessionId('COM1'), 'COM1');
+  })) passed++; else failed++;
+
   // Session ID tests
   console.log('\nSession ID Functions:');
 
-  if (test('getSessionIdShort falls back to project name', () => {
+  if (test('getSessionIdShort falls back to sanitized project name', () => {
     const original = process.env.CLAUDE_SESSION_ID;
     delete process.env.CLAUDE_SESSION_ID;
     try {
       const shortId = utils.getSessionIdShort();
-      assert.strictEqual(shortId, utils.getProjectName());
+      assert.strictEqual(shortId, utils.sanitizeSessionId(utils.getProjectName()));
     } finally {
-      if (original) process.env.CLAUDE_SESSION_ID = original;
+      if (original !== undefined) process.env.CLAUDE_SESSION_ID = original;
+      else delete process.env.CLAUDE_SESSION_ID;
     }
   })) passed++; else failed++;
 
@@ -152,6 +236,28 @@ function runTests() {
       if (original) process.env.CLAUDE_SESSION_ID = original;
       else delete process.env.CLAUDE_SESSION_ID;
     }
+  })) passed++; else failed++;
+
+  if (test('getSessionIdShort sanitizes explicit fallback parameter', () => {
+    if (process.platform === 'win32') {
+      console.log('    (skipped — root CWD differs on Windows)');
+      return true;
+    }
+
+    const utilsPath = path.join(__dirname, '..', '..', 'scripts', 'lib', 'utils.js');
+    const script = `
+      const utils = require('${utilsPath.replace(/'/g, "\\'")}');
+      process.stdout.write(utils.getSessionIdShort('my.fallback'));
+    `;
+    const result = spawnSync('node', ['-e', script], {
+      encoding: 'utf8',
+      cwd: '/',
+      env: { ...process.env, CLAUDE_SESSION_ID: '' },
+      timeout: 10000
+    });
+
+    assert.strictEqual(result.status, 0, `Expected exit 0, got ${result.status}. stderr: ${result.stderr}`);
+    assert.strictEqual(result.stdout, 'my-fallback');
   })) passed++; else failed++;
 
   // File operations tests
@@ -976,11 +1082,118 @@ function runTests() {
     assert.ok(result.output.includes('custom error'), 'Should include stderr output');
   })) passed++; else failed++;
 
-  if (test('runCommand falls back to err.message when no stderr', () => {
-    // An invalid command that won't produce stderr through child process
-    const result = utils.runCommand('nonexistent_cmd_xyz_12345');
+  if (test('runCommand returns error output on failed command', () => {
+    // Use an allowed prefix with a nonexistent subcommand to reach execSync
+    const result = utils.runCommand('git nonexistent-subcmd-xyz-12345');
     assert.strictEqual(result.success, false);
     assert.ok(result.output.length > 0, 'Should have some error output');
+  })) passed++; else failed++;
+
+  // ── runCommand security: allowlist and metacharacter blocking ──
+  console.log('\nrunCommand Security (allowlist + metacharacters):');
+
+  if (test('runCommand blocks disallowed command prefix', () => {
+    const result = utils.runCommand('rm -rf /');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('unrecognized command prefix'), 'Should mention blocked prefix');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks curl command', () => {
+    const result = utils.runCommand('curl http://example.com');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('unrecognized command prefix'));
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks bash command', () => {
+    const result = utils.runCommand('bash -c "echo hello"');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('unrecognized command prefix'));
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks semicolon command chaining', () => {
+    const result = utils.runCommand('git status; echo pwned');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block semicolon chaining');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks pipe command chaining', () => {
+    const result = utils.runCommand('git log | cat');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block pipe chaining');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks ampersand command chaining', () => {
+    const result = utils.runCommand('git status && echo pwned');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block ampersand chaining');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks dollar sign command substitution', () => {
+    const result = utils.runCommand('git log $(whoami)');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block $ substitution');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks backtick command substitution', () => {
+    const result = utils.runCommand('git log `whoami`');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block backtick substitution');
+  })) passed++; else failed++;
+
+  if (test('runCommand allows metacharacters inside double quotes', () => {
+    // Semicolon inside quotes should not trigger metacharacter blocking
+    const result = utils.runCommand('node -e "console.log(1);process.exit(0)"');
+    assert.strictEqual(result.success, true);
+  })) passed++; else failed++;
+
+  if (test('runCommand allows metacharacters inside single quotes', () => {
+    const result = utils.runCommand("node -e 'process.exit(0);'");
+    assert.strictEqual(result.success, true);
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks unquoted metacharacters alongside quoted ones', () => {
+    // Semicolon inside quotes is safe, but && outside is not
+    const result = utils.runCommand('git log "safe;part" && echo pwned');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'));
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks prefix without trailing space', () => {
+    // "gitconfig" starts with "git" but not "git " — must be blocked
+    const result = utils.runCommand('gitconfig --list');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('unrecognized command prefix'));
+  })) passed++; else failed++;
+
+  if (test('runCommand allows npx prefix', () => {
+    const result = utils.runCommand('npx --version');
+    assert.strictEqual(result.success, true);
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks newline command injection', () => {
+    const result = utils.runCommand('git status\necho pwned');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block newline injection');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks $() inside double quotes (shell still evaluates)', () => {
+    // $() inside double quotes is still evaluated by the shell, so block $ everywhere
+    const result = utils.runCommand('node -e "$(whoami)"');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block $ inside quotes');
+  })) passed++; else failed++;
+
+  if (test('runCommand blocks backtick inside double quotes (shell still evaluates)', () => {
+    const result = utils.runCommand('node -e "`whoami`"');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.output.includes('metacharacters not allowed'), 'Should block backtick inside quotes');
+  })) passed++; else failed++;
+
+  if (test('runCommand error message does not leak command string', () => {
+    const secret = 'rm secret_password_123';
+    const result = utils.runCommand(secret);
+    assert.strictEqual(result.success, false);
+    assert.ok(!result.output.includes('secret_password_123'), 'Should not leak command contents');
   })) passed++; else failed++;
 
   // ── Round 31: getGitModifiedFiles with empty patterns ──
@@ -1308,25 +1521,26 @@ function runTests() {
   // ── Round 97: getSessionIdShort with whitespace-only CLAUDE_SESSION_ID ──
   console.log('\nRound 97: getSessionIdShort (whitespace-only session ID):');
 
-  if (test('getSessionIdShort returns whitespace when CLAUDE_SESSION_ID is all spaces', () => {
-    // utils.js line 116: if (sessionId && sessionId.length > 0) — '   ' is truthy
-    // and has length > 0, so it passes the check instead of falling back.
-    const original = process.env.CLAUDE_SESSION_ID;
-    try {
-      process.env.CLAUDE_SESSION_ID = '          ';  // 10 spaces
-      const result = utils.getSessionIdShort('fallback');
-      // slice(-8) on 10 spaces returns 8 spaces — not the expected fallback
-      assert.strictEqual(result, '        ',
-        'Whitespace-only ID should return 8 trailing spaces (no trim check)');
-      assert.strictEqual(result.trim().length, 0,
-        'Result should be entirely whitespace (demonstrating the missing trim)');
-    } finally {
-      if (original !== undefined) {
-        process.env.CLAUDE_SESSION_ID = original;
-      } else {
-        delete process.env.CLAUDE_SESSION_ID;
-      }
+  if (test('getSessionIdShort sanitizes whitespace-only CLAUDE_SESSION_ID to fallback', () => {
+    if (process.platform === 'win32') {
+      console.log('    (skipped — root CWD differs on Windows)');
+      return true;
     }
+
+    const utilsPath = path.join(__dirname, '..', '..', 'scripts', 'lib', 'utils.js');
+    const script = `
+      const utils = require('${utilsPath.replace(/'/g, "\\'")}');
+      process.stdout.write(utils.getSessionIdShort('fallback'));
+    `;
+    const result = spawnSync('node', ['-e', script], {
+      encoding: 'utf8',
+      cwd: '/',
+      env: { ...process.env, CLAUDE_SESSION_ID: '          ' },
+      timeout: 10000
+    });
+
+    assert.strictEqual(result.status, 0, `Expected exit 0, got ${result.status}. stderr: ${result.stderr}`);
+    assert.strictEqual(result.stdout, 'fallback');
   })) passed++; else failed++;
 
   // ── Round 97: countInFile with same RegExp object called twice (lastIndex reuse) ──
@@ -2315,6 +2529,65 @@ function runTests() {
     } finally {
       console.log = origLog;
     }
+  })) passed++; else failed++;
+
+  // ─── stripAnsi ───
+  console.log('\nstripAnsi:');
+
+  if (test('strips SGR color codes (\\x1b[...m)', () => {
+    assert.strictEqual(utils.stripAnsi('\x1b[31mRed text\x1b[0m'), 'Red text');
+    assert.strictEqual(utils.stripAnsi('\x1b[1;36mBold cyan\x1b[0m'), 'Bold cyan');
+  })) passed++; else failed++;
+
+  if (test('strips cursor movement sequences (\\x1b[H, \\x1b[2J, \\x1b[3J)', () => {
+    // These are the exact sequences reported in issue #642
+    assert.strictEqual(utils.stripAnsi('\x1b[H\x1b[2J\x1b[3JHello'), 'Hello');
+    assert.strictEqual(utils.stripAnsi('before\x1b[Hafter'), 'beforeafter');
+  })) passed++; else failed++;
+
+  if (test('strips cursor position sequences (\\x1b[row;colH)', () => {
+    assert.strictEqual(utils.stripAnsi('\x1b[5;10Hplaced'), 'placed');
+  })) passed++; else failed++;
+
+  if (test('strips erase line sequences (\\x1b[K, \\x1b[2K)', () => {
+    assert.strictEqual(utils.stripAnsi('line\x1b[Kend'), 'lineend');
+    assert.strictEqual(utils.stripAnsi('line\x1b[2Kend'), 'lineend');
+  })) passed++; else failed++;
+
+  if (test('strips OSC sequences (window title, hyperlinks)', () => {
+    // OSC terminated by BEL (\x07)
+    assert.strictEqual(utils.stripAnsi('\x1b]0;My Title\x07content'), 'content');
+    // OSC terminated by ST (\x1b\\)
+    assert.strictEqual(utils.stripAnsi('\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\'), 'link');
+  })) passed++; else failed++;
+
+  if (test('strips charset selection (\\x1b(B)', () => {
+    assert.strictEqual(utils.stripAnsi('\x1b(Bnormal'), 'normal');
+  })) passed++; else failed++;
+
+  if (test('strips bare ESC + letter (\\x1bM reverse index)', () => {
+    assert.strictEqual(utils.stripAnsi('line\x1bMup'), 'lineup');
+  })) passed++; else failed++;
+
+  if (test('handles mixed ANSI sequences in one string', () => {
+    const input = '\x1b[H\x1b[2J\x1b[1;36mSession\x1b[0m summary\x1b[K';
+    assert.strictEqual(utils.stripAnsi(input), 'Session summary');
+  })) passed++; else failed++;
+
+  if (test('returns empty string for non-string input', () => {
+    assert.strictEqual(utils.stripAnsi(null), '');
+    assert.strictEqual(utils.stripAnsi(undefined), '');
+    assert.strictEqual(utils.stripAnsi(42), '');
+  })) passed++; else failed++;
+
+  if (test('preserves string with no ANSI codes', () => {
+    assert.strictEqual(utils.stripAnsi('plain text'), 'plain text');
+    assert.strictEqual(utils.stripAnsi(''), '');
+  })) passed++; else failed++;
+
+  if (test('handles CSI with question mark parameter (DEC private modes)', () => {
+    // e.g. \x1b[?25h (show cursor), \x1b[?25l (hide cursor)
+    assert.strictEqual(utils.stripAnsi('\x1b[?25hvisible\x1b[?25l'), 'visible');
   })) passed++; else failed++;
 
   // Summary

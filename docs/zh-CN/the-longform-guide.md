@@ -40,7 +40,7 @@
 要在会话间共享记忆，最好的方法是使用一个技能或命令来总结和检查进度，然后保存到 `.claude` 文件夹中的一个 `.tmp` 文件中，并在会话结束前不断追加内容。第二天，它可以将其用作上下文，并从中断处继续。为每个会话创建一个新文件，这样你就不会将旧的上下文污染到新的工作中。
 
 ![Session Storage File Tree](../../assets/images/longform/03-session-storage.png)
-*会话存储示例 -> https://github.com/affaan-m/everything-claude-code/tree/main/examples/sessions*
+*会话存储示例 -> <https://github.com/affaan-m/everything-claude-code/tree/main/examples/sessions>*
 
 Claude 创建一个总结当前状态的文件。审阅它，如果需要则要求编辑，然后重新开始。对于新的对话，只需提供文件路径。当你达到上下文限制并需要继续复杂工作时，这尤其有用。这些文件应包含：
 
@@ -130,14 +130,14 @@ alias claude-research='claude --system-prompt "$(cat ~/.claude/contexts/research
 **定价参考：**
 
 ![Claude Model Pricing](../../assets/images/longform/05-pricing-table.png)
-*来源：https://platform.claude.com/docs/en/about-claude/pricing*
+*来源: <https://platform.claude.com/docs/en/about-claude/pricing>*
 
 **工具特定优化：**
 
 用 mgrep 替换 grep——与传统 grep 或 ripgrep 相比，平均减少约 50% 的令牌：
 
-![mgrep Benchmark](../../assets/images/longform/06-mgrep-benchmark.png)
-*在我们的 50 项任务基准测试中，mgrep + Claude Code 使用的 token 数量比基于 grep 的工作流少约 2 倍，且判断质量相似或更好。来源：mgrep by @mixedbread-ai*
+![mgrep 基准测试](../../assets/images/longform/06-mgrep-benchmark.png)
+*在我们的 50 个任务基准测试中，mgrep + Claude Code 在相似或更好的判断质量下，使用的 token 数比基于 grep 的工作流少约 2 倍。来源：@mixedbread-ai 的 mgrep*
 
 **模块化代码库的好处：**
 
@@ -161,10 +161,10 @@ alias claude-research='claude --system-prompt "$(cat ~/.claude/contexts/research
 **关键指标：**
 
 ```
-pass@k: At least ONE of k attempts succeeds
+pass@k: 至少 k 次尝试中有一次成功
         k=1: 70%  k=3: 91%  k=5: 97%
 
-pass^k: ALL k attempts must succeed
+pass^k: 所有 k 次尝试都必须成功
         k=1: 70%  k=3: 34%  k=5: 17%
 ```
 

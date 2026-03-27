@@ -135,4 +135,10 @@ lcov + genhtml -> 100% coverage
 
 ## Related Agents
 
-This command invokes the `tdd-guide` agent.
+This command invokes the `tdd-guide` agent provided by ECC.
+
+The related `tdd-workflow` skill is also bundled with ECC.
+
+For manual installs, the source files live at:
+- `agents/tdd-guide.md`
+- `skills/tdd-workflow/SKILL.md`

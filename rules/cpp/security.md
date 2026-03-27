@@ -1,4 +1,23 @@
-# C++ Security Guidelines
+---
+paths:
+  - "**/*.cpp"
+  - "**/*.hpp"
+  - "**/*.cc"
+  - "**/*.hh"
+  - "**/*.cxx"
+  - "**/*.h"
+  - "**/CMakeLists.txt"
+---
+# C++ Security
+
+> This file extends [common/security.md](../common/security.md) with C++ specific content.
+
+## Memory Safety
+
+- Never use raw `new`/`delete` — use smart pointers
+- Never use C-style arrays — use `std::array` or `std::vector`
+- Never use `malloc`/`free` — use C++ allocation
+- Avoid `reinterpret_cast` unless absolutely necessary
 
 ## Mandatory Security Checks
 
@@ -12,7 +31,7 @@ Before ANY commit:
 - [ ] No null pointer dereferences
 - [ ] Error messages don't leak sensitive paths/data
 
-## Memory Safety (CRITICAL)
+## Memory Safety Examples (CRITICAL)
 
 ```cpp
 // NEVER: Raw pointer ownership
@@ -40,6 +59,12 @@ void process(std::span<double> data) {
   }
 }
 ```
+
+## Buffer Overflows
+
+- Use `std::string` over `char*`
+- Use `.at()` for bounds-checked access when safety matters
+- Never use `strcpy`, `strcat`, `sprintf` — use `std::string` or `fmt::format`
 
 ## Data Race Prevention
 
@@ -72,6 +97,13 @@ if (count > std::numeric_limits<size_t>::max() / element_size) {
 }
 size_t total = count * element_size;
 ```
+
+## Undefined Behavior
+
+- Always initialize variables
+- Avoid signed integer overflow
+- Never dereference null or dangling pointers
+- Use sanitizers in CI
 
 ## Sanitizer Usage (MANDATORY in CI)
 
@@ -117,16 +149,16 @@ if (!api_key) {
 }
 ```
 
-## Static Analysis Tools
+## Static Analysis
 
-```bash
-# clang-tidy security checks
-clang-tidy src/*.cpp -- -std=c++20 \
-  -checks='bugprone-*,cert-*,clang-analyzer-security.*,misc-*'
-
-# cppcheck
-cppcheck --enable=all --std=c++20 src/
-```
+- Use **clang-tidy** for automated checks:
+  ```bash
+  clang-tidy --checks='bugprone-*,cert-*,clang-analyzer-security.*,misc-*' src/*.cpp -- -std=c++20
+  ```
+- Use **cppcheck** for additional analysis:
+  ```bash
+  cppcheck --enable=all --std=c++20 src/
+  ```
 
 ## Security Response Protocol
 
@@ -136,3 +168,7 @@ If security issue found:
 3. Fix CRITICAL issues before continuing
 4. Run full sanitizer suite
 5. Review entire codebase for similar issues
+
+## Reference
+
+See skill: `cpp-coding-standards` for detailed security guidelines.

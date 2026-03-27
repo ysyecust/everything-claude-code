@@ -1,8 +1,7 @@
 ---
 name: observer
-description: 背景代理，通过分析会话观察来检测模式并创建本能。使用俳句以实现成本效益。
+description: 分析会话观察以检测模式并创建本能的背景代理。使用Haiku以实现成本效益。v2.1版本增加了项目范围的本能。
 model: haiku
-run_mode: background
 ---
 
 # Observer Agent
@@ -11,20 +10,22 @@ run_mode: background
 
 ## 何时运行
 
-* 在显著会话活动后（20+ 工具调用）
-* 当用户运行 `/analyze-patterns` 时
-* 按计划间隔（可配置，默认 5 分钟）
-* 当被观察钩子触发时 (SIGUSR1)
+* 在积累足够多的观察后（可配置，默认 20 条）
+* 在计划的时间间隔（可配置，默认 5 分钟）
+* 当通过向观察者进程发送 SIGUSR1 信号手动触发时
 
 ## 输入
 
-从 `~/.claude/homunculus/observations.jsonl` 读取观察结果：
+从**项目作用域**的观察文件中读取观察记录：
+
+* 项目：`~/.claude/homunculus/projects/<project-hash>/observations.jsonl`
+* 全局后备：`~/.claude/homunculus/observations.jsonl`
 
 ```jsonl
-{"timestamp":"2025-01-22T10:30:00Z","event":"tool_start","session":"abc123","tool":"Edit","input":"..."}
-{"timestamp":"2025-01-22T10:30:01Z","event":"tool_complete","session":"abc123","tool":"Edit","output":"..."}
-{"timestamp":"2025-01-22T10:30:05Z","event":"tool_start","session":"abc123","tool":"Bash","input":"npm test"}
-{"timestamp":"2025-01-22T10:30:10Z","event":"tool_complete","session":"abc123","tool":"Bash","output":"All tests pass"}
+{"timestamp":"2025-01-22T10:30:00Z","event":"tool_start","session":"abc123","tool":"Edit","input":"...","project_id":"a1b2c3d4e5f6","project_name":"my-react-app"}
+{"timestamp":"2025-01-22T10:30:01Z","event":"tool_complete","session":"abc123","tool":"Edit","output":"...","project_id":"a1b2c3d4e5f6","project_name":"my-react-app"}
+{"timestamp":"2025-01-22T10:30:05Z","event":"tool_start","session":"abc123","tool":"Bash","input":"npm test","project_id":"a1b2c3d4e5f6","project_name":"my-react-app"}
+{"timestamp":"2025-01-22T10:30:10Z","event":"tool_complete","session":"abc123","tool":"Bash","output":"All tests pass","project_id":"a1b2c3d4e5f6","project_name":"my-react-app"}
 ```
 
 ## 模式检测
@@ -73,27 +74,75 @@ run_mode: background
 
 ## 输出
 
-在 `~/.claude/homunculus/instincts/personal/` 中创建/更新本能：
+在**项目作用域**的本能目录中创建/更新本能：
+
+* 项目：`~/.claude/homunculus/projects/<project-hash>/instincts/personal/`
+* 全局：`~/.claude/homunculus/instincts/personal/`（用于通用模式）
+
+### 项目作用域本能（默认）
 
 ```yaml
 ---
-id: prefer-grep-before-edit
-trigger: "when searching for code to modify"
+id: use-react-hooks-pattern
+trigger: "when creating React components"
 confidence: 0.65
-domain: "workflow"
+domain: "code-style"
 source: "session-observation"
+scope: project
+project_id: "a1b2c3d4e5f6"
+project_name: "my-react-app"
 ---
 
-# Prefer Grep Before Edit
+# Use React Hooks Pattern
 
 ## Action
-Always use Grep to find the exact location before using Edit.
+Always use functional components with hooks instead of class components.
 
 ## Evidence
 - Observed 8 times in session abc123
-- Pattern: Grep → Read → Edit sequence
+- Pattern: All new components use useState/useEffect
 - Last observed: 2025-01-22
 ```
+
+### 全局本能（通用模式）
+
+```yaml
+---
+id: always-validate-user-input
+trigger: "when handling user input"
+confidence: 0.75
+domain: "security"
+source: "session-observation"
+scope: global
+---
+
+# Always Validate User Input
+
+## Action
+Validate and sanitize all user input before processing.
+
+## Evidence
+- Observed across 3 different projects
+- Pattern: User consistently adds input validation
+- Last observed: 2025-01-22
+```
+
+## 作用域决策指南
+
+创建本能时，请根据以下经验法则确定其作用域：
+
+| 模式类型 | 作用域 | 示例 |
+|-------------|-------|---------|
+| 语言/框架约定 | **项目** | "使用 React hooks"、"遵循 Django REST 模式" |
+| 文件结构偏好 | **项目** | "测试在 `__tests__`/"、"组件在 src/components/" |
+| 代码风格 | **项目** | "使用函数式风格"、"首选数据类" |
+| 错误处理策略 | **项目**（通常） | "使用 Result 类型处理错误" |
+| 安全实践 | **全局** | "验证用户输入"、"清理 SQL" |
+| 通用最佳实践 | **全局** | "先写测试"、"始终处理错误" |
+| 工具工作流偏好 | **全局** | "编辑前先 Grep"、"写之前先读" |
+| Git 实践 | **全局** | "约定式提交"、"小而专注的提交" |
+
+**如果不确定，默认选择 `scope: project`** — 先设为项目作用域，之后再提升，这比污染全局空间更安全。
 
 ## 置信度计算
 
@@ -110,35 +159,49 @@ Always use Grep to find the exact location before using Edit.
 * 每次矛盾性观察 -0.1
 * 每周无观察 -0.02（衰减）
 
+## 本能提升（项目 → 全局）
+
+当一个本能满足以下条件时，应从项目作用域提升到全局：
+
+1. **相同模式**（通过 id 或类似触发器）存在于 **2 个以上不同的项目**中
+2. 每个实例的置信度 **>= 0.8**
+3. 其领域属于全局友好列表（安全、通用最佳实践、工作流）
+
+提升操作由 `instinct-cli.py promote` 命令或 `/evolve` 分析处理。
+
 ## 重要准则
 
-1. **保持保守**：仅为清晰模式（3+ 次观察）创建本能
+1. **保持保守**：只为明确的模式（3 次以上观察）创建本能
 2. **保持具体**：狭窄的触发器优于宽泛的触发器
-3. **跟踪证据**：始终包含导致本能的观察结果
-4. **尊重隐私**：绝不包含实际代码片段，只包含模式
-5. **合并相似项**：如果新本能与现有本能相似，则更新而非重复
+3. **追踪证据**：始终包含导致该本能的观察记录
+4. **尊重隐私**：切勿包含实际的代码片段，只包含模式
+5. **合并相似项**：如果新本能与现有本能相似，则更新而非重复创建
+6. **默认项目作用域**：除非模式明显是通用的，否则设为项目作用域
+7. **包含项目上下文**：对于项目作用域的本能，始终设置 `project_id` 和 `project_name`
 
 ## 示例分析会话
 
 给定观察结果：
 
 ```jsonl
-{"event":"tool_start","tool":"Grep","input":"pattern: useState"}
-{"event":"tool_complete","tool":"Grep","output":"Found in 3 files"}
-{"event":"tool_start","tool":"Read","input":"src/hooks/useAuth.ts"}
-{"event":"tool_complete","tool":"Read","output":"[file content]"}
-{"event":"tool_start","tool":"Edit","input":"src/hooks/useAuth.ts..."}
+{"event":"tool_start","tool":"Grep","input":"pattern: useState","project_id":"a1b2c3","project_name":"my-app"}
+{"event":"tool_complete","tool":"Grep","output":"Found in 3 files","project_id":"a1b2c3","project_name":"my-app"}
+{"event":"tool_start","tool":"Read","input":"src/hooks/useAuth.ts","project_id":"a1b2c3","project_name":"my-app"}
+{"event":"tool_complete","tool":"Read","output":"[file content]","project_id":"a1b2c3","project_name":"my-app"}
+{"event":"tool_start","tool":"Edit","input":"src/hooks/useAuth.ts...","project_id":"a1b2c3","project_name":"my-app"}
 ```
 
 分析：
 
-* 检测到工作流：Grep → Read → Edit
-* 频率：本次会话中看到 5 次
+* 检测到的工作流：Grep → Read → Edit
+* 频率：本次会话中观察到 5 次
+* **作用域决策**：这是一种通用工作流模式（非项目特定）→ **全局**
 * 创建本能：
-  * 触发器："when modifying code"
-  * 操作："Search with Grep, confirm with Read, then Edit"
+  * 触发器："当修改代码时"
+  * 操作："用 Grep 搜索，用 Read 确认，然后 Edit"
   * 置信度：0.6
   * 领域："workflow"
+  * 作用域："global"
 
 ## 与 Skill Creator 集成
 
@@ -146,5 +209,6 @@ Always use Grep to find the exact location before using Edit.
 
 * `source: "repo-analysis"`
 * `source_repo: "https://github.com/..."`
+* `scope: "project"`（因为它们来自特定的仓库）
 
 这些应被视为具有更高初始置信度（0.7+）的团队/项目约定。

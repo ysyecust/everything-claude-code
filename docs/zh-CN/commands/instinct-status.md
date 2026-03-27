@@ -1,12 +1,12 @@
 ---
 name: instinct-status
-description: 显示所有已学习的本能及其置信水平
+description: 展示已学习的本能（项目+全局）并充满信心
 command: true
 ---
 
 # 本能状态命令
 
-显示所有已学习的本能及其置信度分数，按领域分组。
+显示当前项目学习到的本能以及全局本能，按领域分组。
 
 ## 实现
 
@@ -26,61 +26,34 @@ python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
 
 ```
 /instinct-status
-/instinct-status --domain code-style
-/instinct-status --low-confidence
 ```
 
 ## 操作步骤
 
-1. 从 `~/.claude/homunculus/instincts/personal/` 读取所有本能文件
-2. 从 `~/.claude/homunculus/instincts/inherited/` 读取继承的本能
-3. 按领域分组显示它们，并带有置信度条
+1. 检测当前项目上下文（git remote/路径哈希）
+2. 从 `~/.claude/homunculus/projects/<project-id>/instincts/` 读取项目本能
+3. 从 `~/.claude/homunculus/instincts/` 读取全局本能
+4. 合并并应用优先级规则（当ID冲突时，项目本能覆盖全局本能）
+5. 按领域分组显示，包含置信度条和观察统计数据
 
 ## 输出格式
 
 ```
-📊 Instinct Status
-==================
+============================================================
+  INSTINCT 状态 - 总计 12
+============================================================
 
-## Code Style (4 instincts)
+  项目: my-app (a1b2c3d4e5f6)
+  项目 instincts: 8
+  全局 instincts:  4
 
-### prefer-functional-style
-Trigger: when writing new functions
-Action: Use functional patterns over classes
-Confidence: ████████░░ 80%
-Source: session-observation | Last updated: 2025-01-22
+## 项目范围内 (my-app)
+  ### 工作流 (3)
+    ███████░░░  70%  grep-before-edit [project]
+              触发条件: 当修改代码时
 
-### use-path-aliases
-Trigger: when importing modules
-Action: Use @/ path aliases instead of relative imports
-Confidence: ██████░░░░ 60%
-Source: repo-analysis (github.com/acme/webapp)
-
-## Testing (2 instincts)
-
-### test-first-workflow
-Trigger: when adding new functionality
-Action: Write test first, then implementation
-Confidence: █████████░ 90%
-Source: session-observation
-
-## Workflow (3 instincts)
-
-### grep-before-edit
-Trigger: when modifying code
-Action: Search with Grep, confirm with Read, then Edit
-Confidence: ███████░░░ 70%
-Source: session-observation
-
----
-Total: 9 instincts (4 personal, 5 inherited)
-Observer: Running (last analysis: 5 min ago)
+## 全局 (适用于所有项目)
+  ### 安全 (2)
+    █████████░  85%  validate-user-input [global]
+              触发条件: 当处理用户输入时
 ```
-
-## 标志
-
-* `--domain <name>`：按领域过滤（code-style、testing、git 等）
-* `--low-confidence`：仅显示置信度 < 0.5 的本能
-* `--high-confidence`：仅显示置信度 >= 0.7 的本能
-* `--source <type>`：按来源过滤（session-observation、repo-analysis、inherited）
-* `--json`：以 JSON 格式输出，供编程使用

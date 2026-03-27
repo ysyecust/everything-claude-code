@@ -208,7 +208,7 @@ npm test -- --testPathPattern="existing"
 ### 实施后
 
 ```
-/eval report feature-name
+/eval 报告 功能名称
 ```
 
 生成完整的评估报告
@@ -220,9 +220,9 @@ npm test -- --testPathPattern="existing"
 ```
 .claude/
   evals/
-    feature-xyz.md      # Eval definition
-    feature-xyz.log     # Eval run history
-    baseline.json       # Regression baselines
+    feature-xyz.md      # Eval定义
+    feature-xyz.log     # Eval运行历史
+    baseline.json       # 回归基线
 ```
 
 ## 最佳实践
@@ -267,3 +267,38 @@ npm test -- --testPathPattern="existing"
 状态：可以发布
 
 ```
+
+## 产品评估 (v1.8)
+
+当单元测试无法单独捕获行为质量时，使用产品评估。
+
+### 评分器类型
+
+1. 代码评分器（确定性断言）
+2. 规则评分器（正则表达式/模式约束）
+3. 模型评分器（LLM 作为评判者的评估准则）
+4. 人工评分器（针对模糊输出的人工裁定）
+
+### pass@k 指南
+
+* `pass@1`：直接可靠性
+* `pass@3`：受控重试下的实际可靠性
+* `pass^3`：稳定性测试（所有 3 次运行必须通过）
+
+推荐阈值：
+
+* 能力评估：pass@3 >= 0.90
+* 回归评估：对于发布关键路径，pass^3 = 1.00
+
+### 评估反模式
+
+* 将提示过度拟合到已知的评估示例
+* 仅测量正常路径输出
+* 在追求通过率时忽略成本和延迟漂移
+* 在发布关卡中允许不稳定的评分器
+
+### 最小评估工件布局
+
+* `.claude/evals/<feature>.md` 定义
+* `.claude/evals/<feature>.log` 运行历史
+* `docs/releases/<version>/eval-summary.md` 发布快照

@@ -1,6 +1,6 @@
 ---
 name: instinct-export
-description: 导出本能，与团队成员或其他项目共享
+description: 将项目/全局范围的本能导出到文件
 command: /instinct-export
 ---
 
@@ -15,21 +15,22 @@ command: /instinct-export
 ## 用法
 
 ```
-/instinct-export                           # Export all personal instincts
-/instinct-export --domain testing          # Export only testing instincts
-/instinct-export --min-confidence 0.7      # Only export high-confidence instincts
+/instinct-export                           # 导出所有个人本能
+/instinct-export --domain testing          # 仅导出测试相关本能
+/instinct-export --min-confidence 0.7      # 仅导出高置信度本能
 /instinct-export --output team-instincts.yaml
+/instinct-export --scope project --output project-instincts.yaml
 ```
 
 ## 操作步骤
 
-1. 从 `~/.claude/homunculus/instincts/personal/` 读取本能
-2. 根据标志进行筛选
-3. 剥离敏感信息：
-   * 移除会话 ID
-   * 移除文件路径（仅保留模式）
-   * 移除早于“上周”的时间戳
-4. 生成导出文件
+1. 检测当前项目上下文
+2. 按选定范围加载本能：
+   * `project`: 仅限当前项目
+   * `global`: 仅限全局
+   * `all`: 项目与全局合并（默认）
+3. 应用过滤器（`--domain`, `--min-confidence`）
+4. 将 YAML 格式的导出写入文件（如果未提供输出路径，则写入标准输出）
 
 ## 输出格式
 
@@ -41,54 +42,26 @@ command: /instinct-export
 # Source: personal
 # Count: 12 instincts
 
-version: "2.0"
-exported_by: "continuous-learning-v2"
-export_date: "2025-01-22T10:30:00Z"
+---
+id: prefer-functional-style
+trigger: "when writing new functions"
+confidence: 0.8
+domain: code-style
+source: session-observation
+scope: project
+project_id: a1b2c3d4e5f6
+project_name: my-app
+---
 
-instincts:
-  - id: prefer-functional-style
-    trigger: "when writing new functions"
-    action: "Use functional patterns over classes"
-    confidence: 0.8
-    domain: code-style
-    observations: 8
+# Prefer Functional Style
 
-  - id: test-first-workflow
-    trigger: "when adding new functionality"
-    action: "Write test first, then implementation"
-    confidence: 0.9
-    domain: testing
-    observations: 12
-
-  - id: grep-before-edit
-    trigger: "when modifying code"
-    action: "Search with Grep, confirm with Read, then Edit"
-    confidence: 0.7
-    domain: workflow
-    observations: 6
+## Action
+Use functional patterns over classes.
 ```
-
-## 隐私考虑
-
-导出内容包括：
-
-* ✅ 触发模式
-* ✅ 操作
-* ✅ 置信度分数
-* ✅ 领域
-* ✅ 观察计数
-
-导出内容不包括：
-
-* ❌ 实际代码片段
-* ❌ 文件路径
-* ❌ 会话记录
-* ❌ 个人标识符
 
 ## 标志
 
-* `--domain <name>`：仅导出指定领域
-* `--min-confidence <n>`：最低置信度阈值（默认：0.3）
-* `--output <file>`：输出文件路径（默认：instincts-export-YYYYMMDD.yaml）
-* `--format <yaml|json|md>`：输出格式（默认：yaml）
-* `--include-evidence`：包含证据文本（默认：排除）
+* `--domain <name>`: 仅导出指定领域
+* `--min-confidence <n>`: 最低置信度阈值
+* `--output <file>`: 输出文件路径（省略时打印到标准输出）
+* `--scope <project|global|all>`: 导出范围（默认：`all`）

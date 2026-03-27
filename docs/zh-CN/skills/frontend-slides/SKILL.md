@@ -8,7 +8,7 @@ origin: ECC
 
 创建零依赖、动画丰富的 HTML 演示文稿，完全在浏览器中运行。
 
-灵感来源于 [zarazhangrui](https://github.com/zarazhangrui) 的作品中展示的视觉探索方法。
+受 zarazhangrui（鸣谢：@zarazhangrui）作品中展示的视觉探索方法的启发。
 
 ## 何时启用
 

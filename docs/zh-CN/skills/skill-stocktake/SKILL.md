@@ -62,9 +62,9 @@ cd ~/path/to/my-project
 从脚本输出中呈现扫描摘要和清单表：
 
 ```
-Scanning:
-  ✓ ~/.claude/skills/         (17 files)
-  ✗ {cwd}/.claude/skills/    (not found — global skills only)
+扫描中：
+  ✓ ~/.claude/skills/         (17 个文件)
+  ✗ {cwd}/.claude/skills/    (未找到 — 仅限全局技能)
 ```
 
 | 技能 | 7天使用 | 30天使用 | 描述 |
@@ -72,8 +72,25 @@ Scanning:
 
 ### 第 2 阶段 — 质量评估
 
-启动一个 Task 工具子代理（**Explore 代理，模型：opus**），提供完整的清单和检查清单。
-子代理读取每个技能，应用检查清单，并返回每个技能的 JSON：
+启动一个 **通用代理** 工具子代理，并使用完整的清单和检查项：
+
+```text
+Agent(
+  subagent_type="general-purpose",
+  prompt="
+根据检查清单评估以下技能清单。
+
+[INVENTORY]
+
+[CHECKLIST]
+
+为每项技能返回 JSON：
+{ \"verdict\": \"Keep\"|\"Improve\"|\"Update\"|\"Retire\"|\"Merge into [X]\", \"reason\": \"...\" }
+"
+)
+```
+
+子代理读取每项技能，应用检查项，并返回每项技能的 JSON 结果：
 
 `{ "verdict": "Keep"|"Improve"|"Update"|"Retire"|"Merge into [X]", "reason": "..." }`
 
@@ -86,10 +103,10 @@ Scanning:
 每个技能都根据此检查清单进行评估：
 
 ```
-- [ ] Content overlap with other skills checked
-- [ ] Overlap with MEMORY.md / CLAUDE.md checked
-- [ ] Freshness of technical references verified (use WebSearch if tool names / CLI flags / APIs are present)
-- [ ] Usage frequency considered
+- [ ] 已检查与其他技能的内容重叠情况
+- [ ] 已检查与 MEMORY.md / CLAUDE.md 的重叠情况
+- [ ] 已验证技术引用的时效性（如果存在工具名称 / CLI 参数 / API，请使用 WebSearch 进行验证）
+- [ ] 已考虑使用频率
 ```
 
 判定标准：

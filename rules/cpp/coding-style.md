@@ -1,8 +1,32 @@
-# C++20 Coding Style
+---
+paths:
+  - "**/*.cpp"
+  - "**/*.hpp"
+  - "**/*.cc"
+  - "**/*.hh"
+  - "**/*.cxx"
+  - "**/*.h"
+  - "**/CMakeLists.txt"
+---
+# C++ Coding Style
 
-## RAII (CRITICAL)
+> This file extends [common/coding-style.md](../common/coding-style.md) with C++ specific content.
 
-ALWAYS use RAII for resource management. NEVER manually manage resources:
+## Modern C++ (C++17/20/23)
+
+- Prefer **modern C++ features** over C-style constructs
+- Use `auto` when the type is obvious from context
+- Use `constexpr` for compile-time constants
+- Use structured bindings: `auto [key, value] = map_entry;`
+
+## Resource Management
+
+- **RAII everywhere** — no manual `new`/`delete`
+- Use `std::unique_ptr` for exclusive ownership
+- Use `std::shared_ptr` only when shared ownership is truly needed
+- Use `std::make_unique` / `std::make_shared` over raw `new`
+
+### RAII Examples (CRITICAL)
 
 ```cpp
 // WRONG: Manual resource management
@@ -40,13 +64,6 @@ std::string format_name(const std::string& name) {
 Use move semantics to avoid unnecessary copies:
 
 ```cpp
-// WRONG: Unnecessary copy
-std::vector<double> compute() {
-  std::vector<double> result(1000000);
-  // ... fill result
-  return result;  // OK with NRVO, but be explicit when needed
-}
-
 // CORRECT: Enable move for large objects
 class Mesh {
 public:
@@ -102,6 +119,14 @@ auto result = data
   | std::ranges::to<std::vector>();
 ```
 
+## Naming Conventions
+
+- Types/Classes: `PascalCase`
+- Functions/Methods: `snake_case` or `camelCase` (follow project convention)
+- Constants: `kPascalCase` or `UPPER_SNAKE_CASE`
+- Namespaces: `lowercase`
+- Member variables: `snake_case_` (trailing underscore) or `m_` prefix
+
 ## File Organization
 
 MANY SMALL FILES > FEW LARGE FILES:
@@ -129,39 +154,6 @@ project/
 └── benchmarks/            # Performance benchmarks
 ```
 
-### Naming Conventions (Google C++ Style)
-
-```cpp
-// Types: PascalCase
-class ParticleSystem;
-struct SimConfig;
-enum class SolverType { kJacobi, kGaussSeidel, kMultigrid };
-
-// Functions: PascalCase
-void ComputeGradient();
-double CalculateNorm();
-
-// Variables: snake_case
-int particle_count;
-double time_step;
-
-// Constants: kPascalCase
-constexpr int kMaxIterations = 1000;
-constexpr double kTolerance = 1e-12;
-
-// Member variables: trailing underscore
-class Solver {
-  int max_iter_;
-  double tolerance_;
-};
-
-// Namespaces: snake_case
-namespace hpc::solver { }
-
-// Files: snake_case
-// particle_system.hpp / particle_system.cpp
-```
-
 ## Error Handling
 
 Use exceptions for exceptional conditions, error codes for expected failures:
@@ -182,10 +174,15 @@ void ProcessChunk(std::span<const double> data, int chunk_id) {
 }
 ```
 
+## Formatting
+
+- Use **clang-format** — no style debates
+- Run `clang-format -i <file>` before committing
+
 ## Code Quality Checklist
 
 Before marking work complete:
-- [ ] Code is readable and well-named (Google C++ Style)
+- [ ] Code is readable and well-named
 - [ ] Functions are small (<50 lines)
 - [ ] Files are focused (<1000 lines)
 - [ ] No deep nesting (>4 levels)
@@ -198,3 +195,7 @@ Before marking work complete:
 - [ ] Concepts used for generic constraints
 - [ ] `noexcept` specified where appropriate
 - [ ] `[[nodiscard]]` on functions with important return values
+
+## Reference
+
+See skill: `cpp-coding-standards` for comprehensive C++ coding standards and guidelines.

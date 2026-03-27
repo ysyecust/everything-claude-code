@@ -80,9 +80,10 @@ function runTests() {
     assert.strictEqual(result.shortId, 'abcdef12345678');
   })) passed++; else failed++;
 
-  if (test('rejects short IDs less than 8 chars', () => {
+  if (test('accepts short IDs under 8 chars', () => {
     const result = sessionManager.parseSessionFilename('2026-02-01-abc-session.tmp');
-    assert.strictEqual(result, null);
+    assert.ok(result);
+    assert.strictEqual(result.shortId, 'abc');
   })) passed++; else failed++;
 
   // parseSessionMetadata tests
@@ -94,6 +95,9 @@ function runTests() {
 **Date:** 2026-02-01
 **Started:** 10:30
 **Last Updated:** 14:45
+**Project:** everything-claude-code
+**Branch:** feature/session-metadata
+**Worktree:** /tmp/ecc-worktree
 
 ### Completed
 - [x] Set up project
@@ -114,6 +118,9 @@ src/main.ts
     assert.strictEqual(meta.date, '2026-02-01');
     assert.strictEqual(meta.started, '10:30');
     assert.strictEqual(meta.lastUpdated, '14:45');
+    assert.strictEqual(meta.project, 'everything-claude-code');
+    assert.strictEqual(meta.branch, 'feature/session-metadata');
+    assert.strictEqual(meta.worktree, '/tmp/ecc-worktree');
     assert.strictEqual(meta.completed.length, 2);
     assert.strictEqual(meta.completed[0], 'Set up project');
     assert.strictEqual(meta.inProgress.length, 1);
@@ -334,8 +341,10 @@ src/main.ts
   // Override HOME to a temp dir for isolated getAllSessions/getSessionById tests
   // On Windows, os.homedir() uses USERPROFILE, not HOME — set both for cross-platform
   const tmpHome = path.join(os.tmpdir(), `ecc-session-mgr-test-${Date.now()}`);
-  const tmpSessionsDir = path.join(tmpHome, '.claude', 'sessions');
-  fs.mkdirSync(tmpSessionsDir, { recursive: true });
+  const tmpCanonicalSessionsDir = path.join(tmpHome, '.claude', 'session-data');
+  const tmpLegacySessionsDir = path.join(tmpHome, '.claude', 'sessions');
+  fs.mkdirSync(tmpCanonicalSessionsDir, { recursive: true });
+  fs.mkdirSync(tmpLegacySessionsDir, { recursive: true });
   const origHome = process.env.HOME;
   const origUserProfile = process.env.USERPROFILE;
 
@@ -348,7 +357,10 @@ src/main.ts
     { name: '2026-02-10-session.tmp', content: '# Old format session' },
   ];
   for (let i = 0; i < testSessions.length; i++) {
-    const filePath = path.join(tmpSessionsDir, testSessions[i].name);
+    const targetDir = testSessions[i].name === '2026-02-10-session.tmp'
+      ? tmpLegacySessionsDir
+      : tmpCanonicalSessionsDir;
+    const filePath = path.join(targetDir, testSessions[i].name);
     fs.writeFileSync(filePath, testSessions[i].content);
     // Stagger modification times so sort order is deterministic
     const mtime = new Date(Date.now() - (testSessions.length - i) * 60000);
@@ -392,6 +404,23 @@ src/main.ts
     assert.strictEqual(result.sessions[0].shortId, 'abcd1234');
   })) passed++; else failed++;
 
+  if (test('getAllSessions prefers canonical session-data duplicates over newer legacy copies', () => {
+    const duplicateName = '2026-01-15-abcd1234-session.tmp';
+    const legacyDuplicatePath = path.join(tmpLegacySessionsDir, duplicateName);
+    const legacyMtime = new Date(Date.now() + 60000);
+
+    try {
+      fs.writeFileSync(legacyDuplicatePath, '# Legacy duplicate');
+      fs.utimesSync(legacyDuplicatePath, legacyMtime, legacyMtime);
+
+      const result = sessionManager.getAllSessions({ search: 'abcd', limit: 100 });
+      assert.strictEqual(result.total, 1, 'Duplicate filenames should be deduped');
+      assert.ok(result.sessions[0].sessionPath.includes('session-data'), 'Canonical session-data copy should win');
+    } finally {
+      fs.rmSync(legacyDuplicatePath, { force: true });
+    }
+  })) passed++; else failed++;
+
   if (test('getAllSessions returns sorted by newest first', () => {
     const result = sessionManager.getAllSessions({ limit: 100 });
     for (let i = 1; i < result.sessions.length; i++) {
@@ -416,8 +445,8 @@ src/main.ts
   })) passed++; else failed++;
 
   if (test('getAllSessions ignores non-.tmp files', () => {
-    fs.writeFileSync(path.join(tmpSessionsDir, 'notes.txt'), 'not a session');
-    fs.writeFileSync(path.join(tmpSessionsDir, 'compaction-log.txt'), 'log');
+    fs.writeFileSync(path.join(tmpCanonicalSessionsDir, 'notes.txt'), 'not a session');
+    fs.writeFileSync(path.join(tmpCanonicalSessionsDir, 'compaction-log.txt'), 'log');
     const result = sessionManager.getAllSessions({ limit: 100 });
     assert.strictEqual(result.total, 5, 'Should only count .tmp session files');
   })) passed++; else failed++;
@@ -435,6 +464,23 @@ src/main.ts
     const result = sessionManager.getSessionById('abcd');
     assert.ok(result, 'Should find session by short ID prefix');
     assert.strictEqual(result.shortId, 'abcd1234');
+  })) passed++; else failed++;
+
+  if (test('getSessionById prefers canonical session-data duplicates over newer legacy copies', () => {
+    const duplicateName = '2026-01-15-abcd1234-session.tmp';
+    const legacyDuplicatePath = path.join(tmpLegacySessionsDir, duplicateName);
+    const legacyMtime = new Date(Date.now() + 120000);
+
+    try {
+      fs.writeFileSync(legacyDuplicatePath, '# Legacy duplicate');
+      fs.utimesSync(legacyDuplicatePath, legacyMtime, legacyMtime);
+
+      const result = sessionManager.getSessionById('abcd1234');
+      assert.ok(result, 'Should still resolve the duplicate session');
+      assert.ok(result.sessionPath.includes('session-data'), 'Canonical session-data copy should win');
+    } finally {
+      fs.rmSync(legacyDuplicatePath, { force: true });
+    }
   })) passed++; else failed++;
 
   if (test('getSessionById finds by full filename', () => {
@@ -468,6 +514,12 @@ src/main.ts
   if (test('getSessionById returns null for empty string', () => {
     const result = sessionManager.getSessionById('');
     assert.strictEqual(result, null, 'Empty string should not match any session');
+  })) passed++; else failed++;
+
+  if (test('getSessionById returns null for non-string IDs', () => {
+    assert.strictEqual(sessionManager.getSessionById(null), null);
+    assert.strictEqual(sessionManager.getSessionById(undefined), null);
+    assert.strictEqual(sessionManager.getSessionById(42), null);
   })) passed++; else failed++;
 
   if (test('getSessionById metadata and stats populated when includeContent=true', () => {
@@ -578,14 +630,22 @@ src/main.ts
   // parseSessionFilename edge cases
   console.log('\nparseSessionFilename (additional edge cases):');
 
-  if (test('rejects uppercase letters in short ID', () => {
+  if (test('accepts uppercase letters in short ID', () => {
     const result = sessionManager.parseSessionFilename('2026-02-01-ABCD1234-session.tmp');
-    assert.strictEqual(result, null, 'Uppercase letters should be rejected');
+    assert.ok(result, 'Uppercase letters should be accepted');
+    assert.strictEqual(result.shortId, 'ABCD1234');
   })) passed++; else failed++;
 
-  if (test('rejects filenames with extra segments', () => {
+  if (test('accepts underscores in short ID', () => {
+    const result = sessionManager.parseSessionFilename('2026-02-01-ChezMoi_2-session.tmp');
+    assert.ok(result, 'Underscores should be accepted');
+    assert.strictEqual(result.shortId, 'ChezMoi_2');
+  })) passed++; else failed++;
+
+  if (test('accepts hyphenated short IDs (extra segments)', () => {
     const result = sessionManager.parseSessionFilename('2026-02-01-abc12345-extra-session.tmp');
-    assert.strictEqual(result, null, 'Extra segments should be rejected');
+    assert.ok(result, 'Hyphenated short IDs should be accepted');
+    assert.strictEqual(result.shortId, 'abc12345-extra');
   })) passed++; else failed++;
 
   if (test('rejects impossible month (13)', () => {
@@ -975,7 +1035,7 @@ src/main.ts
     assert.ok(result.endsWith(filename), `Path should end with filename, got: ${result}`);
     // Since HOME is overridden, sessions dir should be under tmpHome
     assert.ok(result.includes('.claude'), 'Path should include .claude directory');
-    assert.ok(result.includes('sessions'), 'Path should include sessions directory');
+    assert.ok(result.includes('session-data'), 'Path should use canonical session-data directory');
   })) passed++; else failed++;
 
   // ── Round 66: getSessionById noIdMatch path (date-only string for old format) ──
@@ -1586,18 +1646,13 @@ src/main.ts
       'Null search should return sessions (confirming they exist but space filtered them)');
   })) passed++; else failed++;
 
-  // ── Round 98: getSessionById with null sessionId throws TypeError ──
-  console.log('\nRound 98: getSessionById (null sessionId — crashes at line 297):');
+  // ── Round 98: getSessionById with null sessionId returns null ──
+  console.log('\nRound 98: getSessionById (null sessionId — guarded null return):');
 
-  if (test('getSessionById(null) throws TypeError when session files exist', () => {
-    // session-manager.js line 297: `sessionId.length > 0` — calling .length on null
-    // throws TypeError because there's no early guard for null/undefined input.
-    // This only surfaces when valid .tmp files exist in the sessions directory.
-    assert.throws(
-      () => sessionManager.getSessionById(null),
-      { name: 'TypeError' },
-      'null.length should throw TypeError (no input guard at function entry)'
-    );
+  if (test('getSessionById(null) returns null when session files exist', () => {
+    // Keep a populated sessions directory so the early input guard is exercised even when
+    // candidate files are present.
+    assert.strictEqual(sessionManager.getSessionById(null), null);
   })) passed++; else failed++;
 
   // Cleanup test environment for Rounds 95-98 that needed sessions
@@ -1614,18 +1669,13 @@ src/main.ts
     // best-effort
   }
 
-  // ── Round 98: parseSessionFilename with null input throws TypeError ──
-  console.log('\nRound 98: parseSessionFilename (null input — crashes at line 30):');
+  // ── Round 98: parseSessionFilename with null input returns null ──
+  console.log('\nRound 98: parseSessionFilename (null input is safely rejected):');
 
-  if (test('parseSessionFilename(null) throws TypeError because null has no .match()', () => {
-    // session-manager.js line 30: `filename.match(SESSION_FILENAME_REGEX)`
-    // When filename is null, null.match() throws TypeError.
-    // Function lacks a type guard like `if (!filename || typeof filename !== 'string')`.
-    assert.throws(
-      () => sessionManager.parseSessionFilename(null),
-      { name: 'TypeError' },
-      'null.match() should throw TypeError (no type guard on filename parameter)'
-    );
+  if (test('parseSessionFilename(null) returns null instead of throwing', () => {
+    assert.strictEqual(sessionManager.parseSessionFilename(null), null);
+    assert.strictEqual(sessionManager.parseSessionFilename(undefined), null);
+    assert.strictEqual(sessionManager.parseSessionFilename(123), null);
   })) passed++; else failed++;
 
   // ── Round 99: writeSessionContent with null path returns false (error caught) ──
@@ -1909,20 +1959,22 @@ file.ts
       'Year 100+ is not affected by the 0-99 → 1900-1999 mapping');
   })) passed++; else failed++;
 
-  // ── Round 110: parseSessionFilename rejects uppercase IDs (regex is [a-z0-9]) ──
-  console.log('\nRound 110: parseSessionFilename (uppercase ID — regex [a-z0-9]{8,} rejects [A-Z]):');
-  if (test('parseSessionFilename rejects filenames with uppercase characters in short ID', () => {
-    // SESSION_FILENAME_REGEX uses [a-z0-9]{8,} — strictly lowercase
+  // ── Round 110: parseSessionFilename accepts mixed-case IDs ──
+  console.log('\nRound 110: parseSessionFilename (mixed-case IDs are accepted):');
+  if (test('parseSessionFilename accepts filenames with uppercase characters in short ID', () => {
     const upperResult = sessionManager.parseSessionFilename('2026-01-15-ABCD1234-session.tmp');
-    assert.strictEqual(upperResult, null,
-      'All-uppercase ID should be rejected by [a-z0-9]{8,}');
+    assert.notStrictEqual(upperResult, null,
+      'All-uppercase ID should be accepted');
+    assert.strictEqual(upperResult.shortId, 'ABCD1234');
+
     const mixedResult = sessionManager.parseSessionFilename('2026-01-15-AbCd1234-session.tmp');
-    assert.strictEqual(mixedResult, null,
-      'Mixed-case ID should be rejected by [a-z0-9]{8,}');
-    // Confirm lowercase is accepted
+    assert.notStrictEqual(mixedResult, null,
+      'Mixed-case ID should be accepted');
+    assert.strictEqual(mixedResult.shortId, 'AbCd1234');
+
     const lowerResult = sessionManager.parseSessionFilename('2026-01-15-abcd1234-session.tmp');
     assert.notStrictEqual(lowerResult, null,
-      'All-lowercase ID should be accepted');
+      'All-lowercase ID should still be accepted');
     assert.strictEqual(lowerResult.shortId, 'abcd1234');
   })) passed++; else failed++;
 
@@ -2189,36 +2241,34 @@ file.ts
     }
   })) passed++; else failed++;
 
-  // ── Round 117: parseSessionFilename with uppercase short ID — regex rejects [A-Z] ──
-  console.log('\nRound 117: parseSessionFilename (uppercase short ID — regex [a-z0-9] rejects uppercase):');
-  if (test('parseSessionFilename rejects uppercase short IDs because regex uses [a-z0-9] not [a-zA-Z0-9]', () => {
-    // The regex: /^(\d{4}-\d{2}-\d{2})(?:-([a-z0-9]{8,}))?-session\.tmp$/
-    // Note: [a-z0-9] — lowercase only
-
-    // All uppercase — rejected
+  // ── Round 117: parseSessionFilename accepts uppercase, underscores, and short IDs ──
+  console.log('\nRound 117: parseSessionFilename (uppercase, underscores, and short IDs are accepted):');
+  if (test('parseSessionFilename accepts uppercase short IDs, underscores, and 7-char names', () => {
     const upper = sessionManager.parseSessionFilename('2026-01-15-ABCDEFGH-session.tmp');
-    assert.strictEqual(upper, null,
-      'All-uppercase ID should be rejected (regex uses [a-z0-9])');
+    assert.notStrictEqual(upper, null,
+      'All-uppercase ID should be accepted');
+    assert.strictEqual(upper.shortId, 'ABCDEFGH');
 
-    // Mixed case — rejected
     const mixed = sessionManager.parseSessionFilename('2026-01-15-AbCdEfGh-session.tmp');
-    assert.strictEqual(mixed, null,
-      'Mixed-case ID should be rejected (uppercase chars not in [a-z0-9])');
+    assert.notStrictEqual(mixed, null,
+      'Mixed-case ID should be accepted');
+    assert.strictEqual(mixed.shortId, 'AbCdEfGh');
 
-    // All lowercase — accepted
     const lower = sessionManager.parseSessionFilename('2026-01-15-abcdefgh-session.tmp');
     assert.notStrictEqual(lower, null, 'All-lowercase ID should be accepted');
     assert.strictEqual(lower.shortId, 'abcdefgh');
 
-    // Uppercase hex-like (common in UUIDs) — rejected
     const hexUpper = sessionManager.parseSessionFilename('2026-01-15-A1B2C3D4-session.tmp');
-    assert.strictEqual(hexUpper, null,
-      'Uppercase hex ID should be rejected');
+    assert.notStrictEqual(hexUpper, null, 'Uppercase hex ID should be accepted');
+    assert.strictEqual(hexUpper.shortId, 'A1B2C3D4');
 
-    // Lowercase hex — accepted
-    const hexLower = sessionManager.parseSessionFilename('2026-01-15-a1b2c3d4-session.tmp');
-    assert.notStrictEqual(hexLower, null, 'Lowercase hex ID should be accepted');
-    assert.strictEqual(hexLower.shortId, 'a1b2c3d4');
+    const underscored = sessionManager.parseSessionFilename('2026-01-15-ChezMoi_2-session.tmp');
+    assert.notStrictEqual(underscored, null, 'IDs with underscores should be accepted');
+    assert.strictEqual(underscored.shortId, 'ChezMoi_2');
+
+    const shortName = sessionManager.parseSessionFilename('2026-01-15-homelab-session.tmp');
+    assert.notStrictEqual(shortName, null, '7-character names should be accepted');
+    assert.strictEqual(shortName.shortId, 'homelab');
   })) passed++; else failed++;
 
   // ── Round 119: parseSessionMetadata "Context to Load" code block extraction ──

@@ -161,7 +161,8 @@ include(FetchContent)
 set(GTEST_VERSION v1.17.0) # Adjust to project policy.
 FetchContent_Declare(
   googletest
-  URL Google Test framework (official repository) https://github.com/google/googletest/archive/refs/tags/${GTEST_VERSION}.zip
+  # Google Test framework (official repository)
+  URL https://github.com/google/googletest/archive/refs/tags/${GTEST_VERSION}.zip
 )
 FetchContent_MakeAvailable(googletest)
 

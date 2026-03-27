@@ -10,29 +10,53 @@ const path = require('path');
 const fs = require('fs');
 
 const testsDir = __dirname;
-const testFiles = [
-  'lib/utils.test.js',
-  'lib/package-manager.test.js',
-  'lib/session-manager.test.js',
-  'lib/session-aliases.test.js',
-  'lib/project-detect.test.js',
-  'hooks/hooks.test.js',
-  'hooks/evaluate-session.test.js',
-  'hooks/suggest-compact.test.js',
-  'integration/hooks.test.js',
-  'ci/validators.test.js',
-  'scripts/claw.test.js',
-  'scripts/setup-package-manager.test.js',
-  'scripts/skill-create-output.test.js'
-];
+const repoRoot = path.resolve(testsDir, '..');
+const TEST_GLOB = 'tests/**/*.test.js';
+
+function matchesTestGlob(relativePath) {
+  const normalized = relativePath.split(path.sep).join('/');
+  if (typeof path.matchesGlob === 'function') {
+    return path.matchesGlob(normalized, TEST_GLOB);
+  }
+
+  return /^tests\/(?:.+\/)?[^/]+\.test\.js$/.test(normalized);
+}
+
+function walkFiles(dir, acc = []) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(fullPath, acc);
+    } else if (entry.isFile()) {
+      acc.push(fullPath);
+    }
+  }
+  return acc;
+}
+
+function discoverTestFiles() {
+  return walkFiles(testsDir)
+    .map(fullPath => path.relative(repoRoot, fullPath))
+    .filter(matchesTestGlob)
+    .map(repoRelativePath => path.relative(testsDir, path.join(repoRoot, repoRelativePath)))
+    .sort();
+}
+
+const testFiles = discoverTestFiles();
 
 const BOX_W = 58; // inner width between ║ delimiters
-const boxLine = (s) => `║${s.padEnd(BOX_W)}║`;
+const boxLine = s => `║${s.padEnd(BOX_W)}║`;
 
 console.log('╔' + '═'.repeat(BOX_W) + '╗');
 console.log(boxLine('           Everything Claude Code - Test Suite'));
 console.log('╚' + '═'.repeat(BOX_W) + '╝');
 console.log();
+
+if (testFiles.length === 0) {
+  console.log(`✗ No test files matched ${TEST_GLOB}`);
+  process.exit(1);
+}
 
 let totalPassed = 0;
 let totalFailed = 0;
@@ -40,13 +64,14 @@ let totalTests = 0;
 
 for (const testFile of testFiles) {
   const testPath = path.join(testsDir, testFile);
+  const displayPath = testFile.split(path.sep).join('/');
 
   if (!fs.existsSync(testPath)) {
-    console.log(`⚠ Skipping ${testFile} (file not found)`);
+    console.log(`⚠ Skipping ${displayPath} (file not found)`);
     continue;
   }
 
-  console.log(`\n━━━ Running ${testFile} ━━━`);
+  console.log(`\n━━━ Running ${displayPath} ━━━`);
 
   const result = spawnSync('node', [testPath], {
     encoding: 'utf8',
@@ -67,6 +92,17 @@ for (const testFile of testFiles) {
 
   if (passedMatch) totalPassed += parseInt(passedMatch[1], 10);
   if (failedMatch) totalFailed += parseInt(failedMatch[1], 10);
+
+  if (result.error) {
+    console.log(`✗ ${displayPath} failed to start: ${result.error.message}`);
+    totalFailed += failedMatch ? 0 : 1;
+    continue;
+  }
+
+  if (result.status !== 0) {
+    console.log(`✗ ${displayPath} exited with status ${result.status}`);
+    totalFailed += failedMatch ? 0 : 1;
+  }
 }
 
 totalTests = totalPassed + totalFailed;

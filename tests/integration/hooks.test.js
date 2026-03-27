@@ -11,6 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
+const REPO_ROOT = path.join(__dirname, '..', '..');
 
 // Test helper
 function _test(name, fn) {
@@ -89,25 +90,47 @@ function runHookWithInput(scriptPath, input = {}, env = {}, timeoutMs = 10000) {
   });
 }
 
+function getSessionStartPayload(stdout) {
+  assert.ok(stdout.trim(), 'Expected SessionStart hook to emit stdout payload');
+  const payload = JSON.parse(stdout);
+  assert.strictEqual(payload.hookSpecificOutput?.hookEventName, 'SessionStart');
+  assert.strictEqual(typeof payload.hookSpecificOutput?.additionalContext, 'string');
+  return payload;
+}
+
 /**
- * Run an inline hook command (like those in hooks.json)
- * @param {string} command - The node -e "..." command
+ * Run a hook command string exactly as declared in hooks.json.
+ * Supports wrapped node script commands and shell wrappers.
+ * @param {string} command - Hook command from hooks.json
  * @param {object} input - Hook input object
  * @param {object} env - Environment variables
  */
-function _runInlineHook(command, input = {}, env = {}, timeoutMs = 10000) {
+function runHookCommand(command, input = {}, env = {}, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
-    // Extract the code from node -e "..."
-    const match = command.match(/^node -e "(.+)"$/s);
-    if (!match) {
-      reject(new Error('Invalid inline hook command format'));
-      return;
-    }
+    const isWindows = process.platform === 'win32';
+    const mergedEnv = { ...process.env, CLAUDE_PLUGIN_ROOT: REPO_ROOT, ...env };
+    const resolvedCommand = command.replace(
+      /\$\{([A-Z_][A-Z0-9_]*)\}/g,
+      (_, name) => String(mergedEnv[name] || '')
+    );
 
-    const proc = spawn('node', ['-e', match[1]], {
-      env: { ...process.env, ...env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const nodeMatch = resolvedCommand.match(/^node\s+"([^"]+)"\s*(.*)$/);
+    const useDirectNodeSpawn = Boolean(nodeMatch);
+    const shell = isWindows ? 'cmd' : 'bash';
+    const shellArgs = isWindows ? ['/d', '/s', '/c', resolvedCommand] : ['-lc', resolvedCommand];
+    const nodeArgs = nodeMatch
+      ? [
+          nodeMatch[1],
+          ...Array.from(
+            nodeMatch[2].matchAll(/"([^"]*)"|(\S+)/g),
+            m => m[1] !== undefined ? m[1] : m[2]
+          )
+        ]
+      : [];
+
+    const proc = useDirectNodeSpawn
+      ? spawn('node', nodeArgs, { env: mergedEnv, stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn(shell, shellArgs, { env: mergedEnv, stdio: ['pipe', 'pipe', 'pipe'] });
 
     let stdout = '';
     let stderr = '';
@@ -116,9 +139,9 @@ function _runInlineHook(command, input = {}, env = {}, timeoutMs = 10000) {
     proc.stdout.on('data', data => stdout += data);
     proc.stderr.on('data', data => stderr += data);
 
-    // Ignore EPIPE errors (process may exit before we finish writing)
+    // Ignore EPIPE/EOF errors (process may exit before we finish writing)
     proc.stdin.on('error', (err) => {
-      if (err.code !== 'EPIPE') {
+      if (err.code !== 'EPIPE' && err.code !== 'EOF') {
         if (timer) clearTimeout(timer);
         reject(err);
       }
@@ -130,8 +153,8 @@ function _runInlineHook(command, input = {}, env = {}, timeoutMs = 10000) {
     proc.stdin.end();
 
     timer = setTimeout(() => {
-      proc.kill('SIGKILL');
-      reject(new Error(`Inline hook timed out after ${timeoutMs}ms`));
+      proc.kill(isWindows ? undefined : 'SIGKILL');
+      reject(new Error(`Hook command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     proc.on('close', code => {
@@ -154,6 +177,16 @@ function createTestDir() {
 // Clean up test directory
 function cleanupTestDir(testDir) {
   fs.rmSync(testDir, { recursive: true, force: true });
+}
+
+function getHookCommandByDescription(hooks, lifecycle, descriptionText) {
+  const hookGroup = hooks.hooks[lifecycle]?.find(
+    entry => entry.description && entry.description.includes(descriptionText)
+  );
+
+  assert.ok(hookGroup, `Expected ${lifecycle} hook matching "${descriptionText}"`);
+  assert.ok(hookGroup.hooks?.[0]?.command, `Expected ${lifecycle} hook command for "${descriptionText}"`);
+  return hookGroup.hooks[0].command;
 }
 
 // Test suite
@@ -224,11 +257,14 @@ async function runTests() {
   // ==========================================
   console.log('\nHook Output Format:');
 
-  if (await asyncTest('hooks output messages to stderr (not stdout)', async () => {
+  if (await asyncTest('session-start logs diagnostics to stderr and emits structured stdout when context exists', async () => {
     const result = await runHookWithInput(path.join(scriptsDir, 'session-start.js'), {});
     // Session-start should write info to stderr
     assert.ok(result.stderr.length > 0, 'Should have stderr output');
     assert.ok(result.stderr.includes('[SessionStart]'), 'Should have [SessionStart] prefix');
+    const payload = getSessionStartPayload(result.stdout);
+    assert.ok(payload.hookSpecificOutput, 'Should include hookSpecificOutput');
+    assert.strictEqual(payload.hookSpecificOutput.hookEventName, 'SessionStart');
   })) passed++; else failed++;
 
   if (await asyncTest('PreCompact hook logs to stderr', async () => {
@@ -236,38 +272,24 @@ async function runTests() {
     assert.ok(result.stderr.includes('[PreCompact]'), 'Should output to stderr with prefix');
   })) passed++; else failed++;
 
-  if (await asyncTest('blocking hooks output BLOCKED message', async () => {
-    // Test the dev server blocking hook — must send a matching command
-    const blockingCommand = hooks.hooks.PreToolUse[0].hooks[0].command;
-    const match = blockingCommand.match(/^node -e "(.+)"$/s);
-
-    const proc = spawn('node', ['-e', match[1]], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stderr = '';
-    let code = null;
-    proc.stderr.on('data', data => stderr += data);
-
-    // Send a dev server command so the hook triggers the block
-    proc.stdin.write(JSON.stringify({
+  if (await asyncTest('dev server hook transforms command to tmux session', async () => {
+    // Test the auto-tmux dev hook — transforms dev commands to run in tmux
+    const hookCommand = getHookCommandByDescription(
+      hooks,
+      'PreToolUse',
+      'Auto-start dev servers in tmux'
+    );
+    const result = await runHookCommand(hookCommand, {
       tool_input: { command: 'npm run dev' }
-    }));
-    proc.stdin.end();
-
-    await new Promise(resolve => {
-      proc.on('close', (c) => {
-        code = c;
-        resolve();
-      });
     });
 
-    // Hook only blocks on non-Windows platforms (tmux is Unix-only)
-    if (process.platform === 'win32') {
-      assert.strictEqual(code, 0, 'On Windows, hook should not block (exit 0)');
-    } else {
-      assert.ok(stderr.includes('BLOCKED'), 'Blocking hook should output BLOCKED');
-      assert.strictEqual(code, 2, 'Blocking hook should exit with code 2');
+    assert.strictEqual(result.code, 0, 'Hook should exit 0 (transforms, does not block)');
+    // On Unix with tmux, stdout contains transformed JSON with tmux command
+    // On Windows or without tmux, stdout contains original JSON passthrough
+    const output = result.stdout.trim();
+    if (output) {
+      const parsed = JSON.parse(output);
+      assert.ok(parsed.tool_input, 'Should output valid JSON with tool_input');
     }
   })) passed++; else failed++;
 
@@ -281,33 +303,68 @@ async function runTests() {
     assert.strictEqual(result.code, 0, 'Non-blocking hook should exit 0');
   })) passed++; else failed++;
 
-  if (await asyncTest('blocking hooks exit with code 2', async () => {
-    // The dev server blocker blocks when a dev server command is detected
-    const blockingCommand = hooks.hooks.PreToolUse[0].hooks[0].command;
-    const match = blockingCommand.match(/^node -e "(.+)"$/s);
-
-    const proc = spawn('node', ['-e', match[1]], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let code = null;
-    proc.stdin.write(JSON.stringify({
+  if (await asyncTest('dev server hook transforms yarn dev to tmux session', async () => {
+    // The auto-tmux dev hook transforms dev commands (yarn dev, npm run dev, etc.)
+    const hookCommand = getHookCommandByDescription(
+      hooks,
+      'PreToolUse',
+      'Auto-start dev servers in tmux'
+    );
+    const result = await runHookCommand(hookCommand, {
       tool_input: { command: 'yarn dev' }
-    }));
-    proc.stdin.end();
-
-    await new Promise(resolve => {
-      proc.on('close', (c) => {
-        code = c;
-        resolve();
-      });
     });
 
-    // Hook only blocks on non-Windows platforms (tmux is Unix-only)
-    if (process.platform === 'win32') {
-      assert.strictEqual(code, 0, 'On Windows, hook should not block (exit 0)');
-    } else {
-      assert.strictEqual(code, 2, 'Blocking hook should exit 2');
+    // Hook always exits 0 — it transforms, never blocks
+    assert.strictEqual(result.code, 0, 'Hook should exit 0 (transforms, does not block)');
+    const output = result.stdout.trim();
+    if (output) {
+      const parsed = JSON.parse(output);
+      assert.ok(parsed.tool_input, 'Should output valid JSON with tool_input');
+      assert.ok(parsed.tool_input.command, 'Should have a command in output');
+    }
+  })) passed++; else failed++;
+
+  if (await asyncTest('MCP health hook blocks unhealthy MCP tool calls through hooks.json', async () => {
+    const hookCommand = getHookCommandByDescription(
+      hooks,
+      'PreToolUse',
+      'Check MCP server health before MCP tool execution'
+    );
+
+    const testDir = createTestDir();
+    const configPath = path.join(testDir, 'claude.json');
+    const statePath = path.join(testDir, 'mcp-health.json');
+    const serverScript = path.join(testDir, 'broken-mcp.js');
+
+    try {
+      fs.writeFileSync(serverScript, 'process.exit(1);\n');
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          mcpServers: {
+            broken: {
+              command: process.execPath,
+              args: [serverScript]
+            }
+          }
+        })
+      );
+
+      const result = await runHookCommand(
+        hookCommand,
+        { tool_name: 'mcp__broken__search', tool_input: {} },
+        {
+          CLAUDE_HOOK_EVENT_NAME: 'PreToolUse',
+          ECC_MCP_CONFIG_PATH: configPath,
+          ECC_MCP_HEALTH_STATE_PATH: statePath,
+          ECC_MCP_HEALTH_TIMEOUT_MS: '100'
+        }
+      );
+
+      assert.strictEqual(result.code, 2, 'Expected unhealthy MCP preflight to block');
+      assert.ok(result.stderr.includes('broken is unavailable'), `Expected health warning, got: ${result.stderr}`);
+    } finally {
+      cleanupTestDir(testDir);
     }
   })) passed++; else failed++;
 
@@ -391,26 +448,13 @@ async function runTests() {
 
     assert.ok(prHook, 'PR hook should exist');
 
-    const match = prHook.hooks[0].command.match(/^node -e "(.+)"$/s);
-
-    const proc = spawn('node', ['-e', match[1]], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stderr = '';
-    proc.stderr.on('data', data => stderr += data);
-
-    // Simulate gh pr create output
-    proc.stdin.write(JSON.stringify({
+    const result = await runHookCommand(prHook.hooks[0].command, {
       tool_input: { command: 'gh pr create --title "Test"' },
       tool_output: { output: 'Creating pull request...\nhttps://github.com/owner/repo/pull/123' }
-    }));
-    proc.stdin.end();
-
-    await new Promise(resolve => proc.on('close', resolve));
+    });
 
     assert.ok(
-      stderr.includes('PR created') || stderr.includes('github.com'),
+      result.stderr.includes('PR created') || result.stderr.includes('github.com'),
       'Should extract and log PR URL'
     );
   })) passed++; else failed++;
@@ -678,8 +722,18 @@ async function runTests() {
     assert.strictEqual(typeof asyncHook.hooks[0].timeout, 'number', 'Timeout should be a number');
     assert.ok(asyncHook.hooks[0].timeout > 0, 'Timeout should be positive');
 
-    const match = asyncHook.hooks[0].command.match(/^node -e "(.+)"$/s);
-    assert.ok(match, 'Async hook command should be node -e format');
+    const command = asyncHook.hooks[0].command;
+    const isNodeInline = command.startsWith('node -e');
+    const isNodeScript = command.startsWith('node "');
+    const isShellWrapper =
+      command.startsWith('bash "') ||
+      command.startsWith('sh "') ||
+      command.startsWith('bash -lc ') ||
+      command.startsWith('sh -c ');
+    assert.ok(
+      isNodeInline || isNodeScript || isShellWrapper,
+      `Async hook command should be runnable (node -e, node script, or shell wrapper), got: ${command.substring(0, 80)}`
+    );
   })) passed++; else failed++;
 
   if (await asyncTest('all hook commands in hooks.json are valid format', async () => {
@@ -692,11 +746,17 @@ async function runTests() {
 
           const isInline = hook.command.startsWith('node -e');
           const isFilePath = hook.command.startsWith('node "');
-          const isShellScript = hook.command.endsWith('.sh');
+          const isNpx = hook.command.startsWith('npx ');
+          const isShellWrapper =
+            hook.command.startsWith('bash "') ||
+            hook.command.startsWith('sh "') ||
+            hook.command.startsWith('bash -lc ') ||
+            hook.command.startsWith('sh -c ');
+          const isShellScriptPath = hook.command.endsWith('.sh');
 
           assert.ok(
-            isInline || isFilePath || isShellScript,
-            `Hook command in ${hookType} should be inline (node -e), file path (node "), or shell script (.sh), got: ${hook.command.substring(0, 80)}`
+            isInline || isFilePath || isNpx || isShellWrapper || isShellScriptPath,
+            `Hook command in ${hookType} should be node -e, node script, npx, or shell wrapper/script, got: ${hook.command.substring(0, 80)}`
           );
         }
       }

@@ -6,10 +6,10 @@ This supplements the root `AGENTS.md` with Codex-specific guidance.
 
 | Task Type | Recommended Model |
 |-----------|------------------|
-| Routine coding, tests, formatting | o4-mini |
-| Complex features, architecture | o3 |
-| Debugging, refactoring | o4-mini |
-| Security review | o3 |
+| Routine coding, tests, formatting | GPT 5.4 |
+| Complex features, architecture | GPT 5.4 |
+| Debugging, refactoring | GPT 5.4 |
+| Security review | GPT 5.4 |
 
 ## Skills Discovery
 
@@ -34,10 +34,42 @@ Available skills:
 - strategic-compact — Context management
 - api-design — REST API design patterns
 - verification-loop — Build, test, lint, typecheck, security
+- deep-research — Multi-source research with firecrawl and exa MCPs
+- exa-search — Neural search via Exa MCP for web, code, and companies
+- claude-api — Anthropic Claude API patterns and SDKs
+- x-api — X/Twitter API integration for posting, threads, and analytics
+- crosspost — Multi-platform content distribution
+- fal-ai-media — AI image/video/audio generation via fal.ai
+- dmux-workflows — Multi-agent orchestration with dmux
 
 ## MCP Servers
 
-Configure in `~/.codex/config.toml` under `[mcp_servers]`. See `.codex/config.toml` for reference configuration with GitHub, Context7, Memory, and Sequential Thinking servers.
+Treat the project-local `.codex/config.toml` as the default Codex baseline for ECC. The current ECC baseline enables GitHub, Context7, Exa, Memory, Playwright, and Sequential Thinking; add heavier extras in `~/.codex/config.toml` only when a task actually needs them.
+
+### Automatic config.toml merging
+
+The sync script (`scripts/sync-ecc-to-codex.sh`) uses a Node-based TOML parser to safely merge ECC MCP servers into `~/.codex/config.toml`:
+
+- **Add-only by default** — missing ECC servers are appended; existing servers are never modified or removed.
+- **7 managed servers** — Supabase, Playwright, Context7, Exa, GitHub, Memory, Sequential Thinking.
+- **Package-manager aware** — uses the project's configured package manager (npm/pnpm/yarn/bun) instead of hardcoding `pnpm`.
+- **Drift warnings** — if an existing server's config differs from the ECC recommendation, the script logs a warning.
+- **`--update-mcp`** — explicitly replaces all ECC-managed servers with the latest recommended config (safely removes subtables like `[mcp_servers.supabase.env]`).
+- **User config is always preserved** — custom servers, args, env vars, and credentials outside ECC-managed sections are never touched.
+
+## Multi-Agent Support
+
+Codex now supports multi-agent workflows behind the experimental `features.multi_agent` flag.
+
+- Enable it in `.codex/config.toml` with `[features] multi_agent = true`
+- Define project-local roles under `[agents.<name>]`
+- Point each role at a TOML layer under `.codex/agents/`
+- Use `/agent` inside Codex CLI to inspect and steer child agents
+
+Sample role configs in this repo:
+- `.codex/agents/explorer.toml` — read-only evidence gathering
+- `.codex/agents/reviewer.toml` — correctness/security review
+- `.codex/agents/docs-researcher.toml` — API and release-note verification
 
 ## Key Differences from Claude Code
 
@@ -47,9 +79,9 @@ Configure in `~/.codex/config.toml` under `[mcp_servers]`. See `.codex/config.to
 | Context file | CLAUDE.md + AGENTS.md | AGENTS.md only |
 | Skills | Skills loaded via plugin | `.agents/skills/` directory |
 | Commands | `/slash` commands | Instruction-based |
-| Agents | Subagent Task tool | Single agent model |
+| Agents | Subagent Task tool | Multi-agent via `/agent` and `[agents.<name>]` roles |
 | Security | Hook-based enforcement | Instruction + sandbox |
-| MCP | Full support | Command-based only |
+| MCP | Full support | Supported via `config.toml` and `codex mcp add` |
 
 ## Security Without Hooks
 

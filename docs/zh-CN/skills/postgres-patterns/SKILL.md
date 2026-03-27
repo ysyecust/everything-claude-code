@@ -151,4 +151,4 @@ SELECT pg_reload_conf();
 
 ***
 
-*基于 [Supabase Agent Skills](Supabase Agent Skills (credit: Supabase team)) (MIT License)*
+*基于 Supabase 代理技能（致谢：Supabase 团队）（MIT 许可证）*

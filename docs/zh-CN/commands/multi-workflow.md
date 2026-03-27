@@ -13,9 +13,9 @@
 ## 上下文
 
 * 待开发任务：$ARGUMENTS
-* 结构化的 6 阶段工作流程，包含质量门控
+* 结构化的 6 阶段工作流程，带有质量关卡
 * 多模型协作：Codex（后端） + Gemini（前端） + Claude（编排）
-* MCP 服务集成（ace-tool）以增强能力
+* 集成 MCP 服务（ace-tool，可选）以增强能力
 
 ## 你的角色
 
@@ -23,8 +23,8 @@
 
 **协作模型**：
 
-* **ace-tool MCP** – 代码检索 + 提示词增强
-* **Codex** – 后端逻辑、算法、调试（**后端权威，可信赖**）
+* **ace-tool MCP**（可选） – 代码检索 + 提示增强
+* **Codex** – 后端逻辑、算法、调试（**后端权威，值得信赖**）
 * **Gemini** – 前端 UI/UX、视觉设计（**前端专家，后端意见仅供参考**）
 * **Claude（自身）** – 编排、规划、执行、交付
 
@@ -35,34 +35,34 @@
 **调用语法**（并行：`run_in_background: true`，串行：`false`）：
 
 ```
-# New session call
+# 新会话调用
 Bash({
   command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}- \"$PWD\" <<'EOF'
-ROLE_FILE: <role prompt path>
+ROLE_FILE: <角色提示文件路径>
 <TASK>
-Requirement: <enhanced requirement (or $ARGUMENTS if not enhanced)>
-Context: <project context and analysis from previous phases>
+需求: <增强后的需求（如未增强则为$ARGUMENTS）>
+上下文: <来自先前阶段的项目上下文和分析>
 </TASK>
-OUTPUT: Expected output format
+OUTPUT: 期望的输出格式
 EOF",
   run_in_background: true,
   timeout: 3600000,
-  description: "Brief description"
+  description: "简要描述"
 })
 
-# Resume session call
+# 恢复会话调用
 Bash({
   command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend <codex|gemini> {{GEMINI_MODEL_FLAG}}resume <SESSION_ID> - \"$PWD\" <<'EOF'
-ROLE_FILE: <role prompt path>
+ROLE_FILE: <角色提示文件路径>
 <TASK>
-Requirement: <enhanced requirement (or $ARGUMENTS if not enhanced)>
-Context: <project context and analysis from previous phases>
+需求: <增强后的需求（如未增强则为$ARGUMENTS）>
+上下文: <来自先前阶段的项目上下文和分析>
 </TASK>
-OUTPUT: Expected output format
+OUTPUT: 期望的输出格式
 EOF",
   run_in_background: true,
   timeout: 3600000,
-  description: "Brief description"
+  description: "简要描述"
 })
 ```
 
@@ -104,6 +104,14 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 4. 当评分 < 7 或用户不批准时强制停止。
 5. 需要时（例如确认/选择/批准）使用 `AskUserQuestion` 工具进行用户交互。
 
+## 何时使用外部编排
+
+当工作必须拆分给需要隔离的 git 状态、独立终端或独立构建/测试执行的并行工作器时，请使用外部 tmux/工作树编排。对于轻量级分析、规划或审查（其中主会话是唯一的写入者），请使用进程内子代理。
+
+```bash
+node scripts/orchestrate-worktrees.js .claude/plan/workflow-e2e-test.json --execute
+```
+
 ***
 
 ## 执行工作流程
@@ -114,11 +122,11 @@ TaskOutput({ task_id: "<task_id>", block: true, timeout: 600000 })
 
 `[Mode: Research]` - 理解需求并收集上下文：
 
-1. **提示词增强**：调用 `mcp__ace-tool__enhance_prompt`，**将所有后续对 Codex/Gemini 的调用中的原始 $ARGUMENTS 替换为增强后的结果**
-2. **上下文检索**：调用 `mcp__ace-tool__search_context`
-3. **需求完整性评分** (0-10)：
-   * 目标清晰度 (0-3)，预期成果 (0-3)，范围边界 (0-2)，约束条件 (0-2)
-   * ≥7：继续 | <7：停止，询问澄清问题
+1. **提示增强**（如果 ace-tool MCP 可用）：调用 `mcp__ace-tool__enhance_prompt`，**用增强后的结果替换原始的 $ARGUMENTS，用于所有后续的 Codex/Gemini 调用**。如果不可用，直接使用 `$ARGUMENTS`。
+2. **上下文检索**（如果 ace-tool MCP 可用）：调用 `mcp__ace-tool__search_context`。如果不可用，使用内置工具：`Glob` 用于文件发现，`Grep` 用于符号搜索，`Read` 用于上下文收集，`Task`（探索代理）用于更深入的探索。
+3. **需求完整性评分**（0-10）：
+   * 目标清晰度（0-3）、预期结果（0-3）、范围边界（0-2）、约束条件（0-2）
+   * ≥7：继续 | <7：停止，询问澄清性问题
 
 ### 阶段 2：解决方案构思
 
