@@ -401,11 +401,207 @@ void BenchmarkMatVec(size_t N, int repeats) {
 }
 ```
 
+## Google Benchmark Integration
+
+```cpp
+#include <benchmark/benchmark.h>
+
+// Basic benchmark
+static void BM_VectorAdd(benchmark::State& state) {
+  const size_t N = state.range(0);
+  std::vector<double> a(N, 1.0), b(N, 2.0), c(N);
+
+  for (auto _ : state) {
+    for (size_t i = 0; i < N; ++i) c[i] = a[i] + b[i];
+    benchmark::DoNotOptimize(c.data());
+    benchmark::ClobberMemory();
+  }
+  state.SetBytesProcessed(state.iterations() * N * 3 * sizeof(double));
+  state.SetItemsProcessed(state.iterations() * N);
+  state.counters["FLOPS"] = benchmark::Counter(
+      state.iterations() * N, benchmark::Counter::kIsRate);
+}
+
+BENCHMARK(BM_VectorAdd)
+    ->RangeMultiplier(4)->Range(1<<10, 1<<24)
+    ->Unit(benchmark::kMicrosecond);
+
+// Compare implementations
+static void BM_MatMulNaive(benchmark::State& state) { /* ... */ }
+static void BM_MatMulBlocked(benchmark::State& state) { /* ... */ }
+
+BENCHMARK(BM_MatMulNaive)->DenseRange(64, 512, 64);
+BENCHMARK(BM_MatMulBlocked)->DenseRange(64, 512, 64);
+```
+
+```cmake
+# CMake integration
+find_package(benchmark REQUIRED)
+add_executable(bench_hpc benchmarks/bench_hpc.cpp)
+target_link_libraries(bench_hpc benchmark::benchmark project_math)
+```
+
+## Profiling with perf & Flamegraph
+
+```bash
+# CPU profiling
+perf record -g --call-graph dwarf -F 99 ./build/release/my_app
+perf report --hierarchy --sort comm,dso,sym
+
+# Generate flamegraph
+perf script | stackcollapse-perf.pl | flamegraph.pl > cpu.svg
+
+# Cache miss analysis
+perf stat -e cache-references,cache-misses,L1-dcache-load-misses \
+  ./build/release/my_app
+
+# Branch prediction
+perf stat -e branch-instructions,branch-misses ./build/release/my_app
+```
+
+### Memory Profiling
+
+```bash
+# Heap profiling with heaptrack
+heaptrack ./build/debug/my_app
+heaptrack_gui heaptrack.my_app.*.gz
+
+# Valgrind cachegrind (cache behavior)
+valgrind --tool=cachegrind ./build/debug/my_app
+cg_annotate cachegrind.out.<pid>
+```
+
+## MPI Parallel Patterns
+
+### Basic MPI with RAII Wrapper
+
+```cpp
+#include <mpi.h>
+#include <span>
+
+class MPIGuard {
+public:
+  MPIGuard(int& argc, char**& argv) { MPI_Init(&argc, &argv); }
+  ~MPIGuard() { MPI_Finalize(); }
+  MPIGuard(const MPIGuard&) = delete;
+  MPIGuard& operator=(const MPIGuard&) = delete;
+};
+
+struct MPIContext {
+  int rank, size;
+  MPIContext() {
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+  }
+  [[nodiscard]] bool is_root() const { return rank == 0; }
+};
+```
+
+### Domain Decomposition
+
+```cpp
+// Distribute N elements across ranks
+struct Partition {
+  size_t local_start, local_count;
+
+  static Partition Compute(size_t N, int rank, int num_ranks) {
+    size_t base = N / num_ranks;
+    size_t remainder = N % num_ranks;
+    size_t start = rank * base + std::min<size_t>(rank, remainder);
+    size_t count = base + (static_cast<size_t>(rank) < remainder ? 1 : 0);
+    return {start, count};
+  }
+};
+
+// Scatter-Compute-Gather pattern
+void ParallelSolve(std::span<double> global_data, const MPIContext& ctx) {
+  auto [start, count] = Partition::Compute(global_data.size(), ctx.rank, ctx.size);
+  std::vector<double> local(count);
+
+  MPI_Scatterv(global_data.data(), /* ... */);
+  // Local computation
+  for (auto& v : local) v = Compute(v);
+  MPI_Gatherv(local.data(), /* ... */);
+}
+```
+
+### MPI + OpenMP Hybrid
+
+```cpp
+// Thread-level parallelism within MPI rank
+void HybridCompute(std::span<double> local_data) {
+  #pragma omp parallel for schedule(dynamic, 64)
+  for (size_t i = 0; i < local_data.size(); ++i) {
+    local_data[i] = ExpensiveOp(local_data[i]);
+  }
+  // MPI communication between ranks (outside OpenMP region)
+  MPI_Allreduce(MPI_IN_PLACE, local_data.data(),
+                local_data.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+}
+```
+
+### Testing MPI Code
+
+```bash
+# Run MPI tests with CTest
+# CMakeLists.txt:
+#   add_test(NAME mpi_test_4 COMMAND mpirun -np 4 $<TARGET_FILE:test_mpi>)
+#   set_tests_properties(mpi_test_4 PROPERTIES PROCESSORS 4)
+
+ctest --test-dir build -R mpi_ --output-on-failure
+```
+
+```cpp
+// Google Test with MPI
+class MPITest : public ::testing::Test {
+protected:
+  MPIContext ctx_;
+};
+
+TEST_F(MPITest, PartitionCoversAll) {
+  const size_t N = 1000;
+  auto [start, count] = Partition::Compute(N, ctx_.rank, ctx_.size);
+
+  size_t total = 0;
+  MPI_Allreduce(&count, &total, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+  EXPECT_EQ(total, N);
+}
+```
+
+## GPU Offloading Patterns (CUDA/HIP)
+
+### Unified Memory with RAII
+
+```cpp
+template <typename T>
+class DeviceVector {
+public:
+  explicit DeviceVector(size_t n) : size_(n) {
+    cudaMallocManaged(&data_, n * sizeof(T));
+  }
+  ~DeviceVector() { cudaFree(data_); }
+
+  T* data() { return data_; }
+  size_t size() const { return size_; }
+
+  DeviceVector(const DeviceVector&) = delete;
+  DeviceVector& operator=(const DeviceVector&) = delete;
+  DeviceVector(DeviceVector&& o) noexcept : data_(o.data_), size_(o.size_) {
+    o.data_ = nullptr; o.size_ = 0;
+  }
+
+private:
+  T* data_ = nullptr;
+  size_t size_ = 0;
+};
+```
+
 ---
 
 **Key Principles**:
-1. Measure before optimizing
-2. Profile to find bottlenecks
-3. Optimize data layout first (cache)
-4. Then parallelism (threads/SIMD)
-5. Verify correctness after optimization (use sanitizers)
+1. Measure before optimizing — use perf/flamegraph, not intuition
+2. Profile to find bottlenecks — cache misses often dominate
+3. Optimize data layout first (cache/SoA)
+4. Then parallelism (threads/SIMD/MPI/GPU)
+5. Benchmark with Google Benchmark for regression detection
+6. Verify correctness after optimization (use sanitizers)
