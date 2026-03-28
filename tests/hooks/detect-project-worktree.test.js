@@ -169,7 +169,7 @@ test('detect-project.sh sets PROJECT_NAME and non-global PROJECT_ID for worktree
     const mainRepo = path.join(testDir, 'main-repo');
     fs.mkdirSync(mainRepo, { recursive: true });
     execSync('git init', { cwd: mainRepo, stdio: 'pipe' });
-    execSync('git commit --allow-empty -m "init"', {
+    execSync('git -c commit.gpgsign=false commit --allow-empty -m "init"', {
       cwd: mainRepo,
       stdio: 'pipe',
       env: {

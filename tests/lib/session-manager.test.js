@@ -2052,6 +2052,11 @@ file.ts
       assert.ok(true, 'Skipped on Windows');
       return;
     }
+    if (process.getuid && process.getuid() === 0) {
+      // root bypasses file permission checks — skip
+      assert.ok(true, 'Skipped when running as root');
+      return;
+    }
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'r112-readonly-'));
     const readOnlyFile = path.join(tmpDir, '2026-01-15-session.tmp');
     try {

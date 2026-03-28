@@ -1233,6 +1233,10 @@ function runTests() {
       console.log('    (skipped — chmod not reliable on Windows)');
       return;
     }
+    if (process.getuid && process.getuid() === 0) {
+      console.log('    (skipped — chmod restrictions do not apply to root)');
+      return;
+    }
     const isoHome = path.join(os.tmpdir(), `ecc-r90-restore-fail-${Date.now()}`);
     const claudeDir = path.join(isoHome, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
