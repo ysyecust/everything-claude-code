@@ -41,6 +41,8 @@ git log --oneline -n 200 | cut -d' ' -f2- | head -50
 
 ### Step 2: Detect Patterns
 
+Look for these pattern types:
+
 | Pattern | Detection Method |
 |---------|-----------------|
 | **Commit conventions** | Regex on commit messages (feat:, fix:, chore:) |
@@ -77,8 +79,43 @@ analyzed_commits: {count}
 {detected test conventions}
 ```
 
+### Step 4: Generate Instincts (if --instincts)
+
+For continuous-learning-v2 integration:
+
+```yaml
+---
+id: {repo}-commit-convention
+trigger: "when writing a commit message"
+confidence: 0.8
+domain: git
+source: local-repo-analysis
+---
+
+# Use Conventional Commits
+
+## Action
+Prefix commits with: feat:, fix:, chore:, docs:, test:, refactor:
+
+## Evidence
+- Analyzed {n} commits
+- {percentage}% follow conventional commit format
+```
+
+## GitHub App Integration
+
+For advanced features (10k+ commits, team sharing, auto-PRs), use the [Skill Creator GitHub App](https://github.com/apps/skill-creator):
+
+- Install: [github.com/apps/skill-creator](https://github.com/apps/skill-creator)
+- Comment `/skill-creator analyze` on any issue
+- Receives PR with generated skills
+
 ## Related Commands
 
 - `/instinct-import` - Import generated instincts
 - `/instinct-status` - View learned instincts
 - `/evolve` - Cluster instincts into skills/agents
+
+---
+
+*Part of [Everything Claude Code](https://github.com/affaan-m/everything-claude-code)*

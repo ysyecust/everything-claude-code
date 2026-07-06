@@ -1,6 +1,12 @@
+---
+description: Create a multi-model implementation plan without modifying production code.
+---
+
 # Plan - Multi-Model Collaborative Planning
 
 Multi-model collaborative planning - Context retrieval + Dual-model analysis → Generate step-by-step implementation plan.
+
+> **Prerequisite:** Requires the external `ccg-workflow` runtime, which is **not** part of the base ECC install. Initialize it with `npx ccg-workflow` to provision `~/.claude/bin/codeagent-wrapper` and the `~/.claude/.ccg/prompts/*` role files this command depends on. Without that runtime, this command will not run correctly.
 
 $ARGUMENTS
 
@@ -203,19 +209,19 @@ Synthesize both analyses, generate **Step-by-step Implementation Plan**:
 2. Save plan to `.claude/plan/<feature-name>.md` (extract feature name from requirement, e.g., `user-auth`, `payment-module`)
 3. Output prompt in **bold text** (MUST use actual saved file path):
 
-   ---
-   **Plan generated and saved to `.claude/plan/actual-feature-name.md`**
+---
+**Plan generated and saved to `.claude/plan/actual-feature-name.md`**
 
-   **Please review the plan above. You can:**
-   - **Modify plan**: Tell me what needs adjustment, I'll update the plan
-   - **Execute plan**: Copy the following command to a new session
+**Please review the plan above. You can:**
+- **Modify plan**: Tell me what needs adjustment, I'll update the plan
+- **Execute plan**: Copy the following command to a new session
 
-   ```
-   /ccg:execute .claude/plan/actual-feature-name.md
-   ```
-   ---
+```
+/ccg:execute .claude/plan/actual-feature-name.md
+```
+---
 
-   **NOTE**: The `actual-feature-name.md` above MUST be replaced with the actual saved filename!
+**NOTE**: The `actual-feature-name.md` above MUST be replaced with the actual saved filename!
 
 4. **Immediately terminate current response** (Stop here. No more tool calls.)
 

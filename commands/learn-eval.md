@@ -64,28 +64,28 @@ origin: auto-extracted
 
    ### 5b. Holistic verdict
 
-   Synthesize the checklist results and draft quality, then choose **one** of the following:
+   Synthesize the checklist results and draft quality, then choose **one** of the following (Step 6 defines the action each verdict triggers):
 
-   | Verdict | Meaning | Next Action |
-   |---------|---------|-------------|
-   | **Save** | Unique, specific, well-scoped | Proceed to Step 6 |
-   | **Improve then Save** | Valuable but needs refinement | List improvements → revise → re-evaluate (once) |
-   | **Absorb into [X]** | Should be appended to an existing skill | Show target skill and additions → Step 6 |
-   | **Drop** | Trivial, redundant, or too abstract | Explain reasoning and stop |
+   | Verdict | Meaning |
+   |---------|---------|
+   | **Save** | Unique, specific, well-scoped |
+   | **Improve then Save** | Valuable but needs refinement |
+   | **Absorb into [X]** | Should be appended to an existing skill |
+   | **Drop** | Trivial, redundant, or too abstract |
 
-   **Guideline dimensions** (informing the verdict, not scored):
+**Guideline dimensions** (informing the verdict, not scored):
 
-   - **Specificity & Actionability**: Contains code examples or commands that are immediately usable
-   - **Scope Fit**: Name, trigger conditions, and content are aligned and focused on a single pattern
-   - **Uniqueness**: Provides value not covered by existing skills (informed by checklist results)
-   - **Reusability**: Realistic trigger scenarios exist in future sessions
+- **Specificity & Actionability**: Contains code examples or commands that are immediately usable
+- **Scope Fit**: Name, trigger conditions, and content are aligned and focused on a single pattern
+- **Uniqueness**: Provides value not covered by existing skills (informed by checklist results)
+- **Reusability**: Realistic trigger scenarios exist in future sessions
 
 6. **Verdict-specific confirmation flow**
 
-   - **Improve then Save**: Present the required improvements + revised draft + updated checklist/verdict after one re-evaluation; if the revised verdict is **Save**, save after user confirmation, otherwise follow the new verdict
-   - **Save**: Present save path + checklist results + 1-line verdict rationale + full draft → save after user confirmation
-   - **Absorb into [X]**: Present target path + additions (diff format) + checklist results + verdict rationale → append after user confirmation
-   - **Drop**: Show checklist results + reasoning only (no confirmation needed)
+- **Improve then Save**: Present the required improvements + revised draft + updated checklist/verdict after one re-evaluation; if the revised verdict is **Save**, save after user confirmation, otherwise follow the new verdict
+- **Save**: Present save path + checklist results + 1-line verdict rationale + full draft → save after user confirmation
+- **Absorb into [X]**: Present target path + additions (diff format) + checklist results + verdict rationale → append after user confirmation
+- **Drop**: Show checklist results + reasoning only (no confirmation needed)
 
 7. Save / Absorb to the determined location
 

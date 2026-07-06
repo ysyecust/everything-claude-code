@@ -69,8 +69,18 @@ function runTests() {
 
   if (test('filesystem-changing calls use argv-form run_or_echo invocations', () => {
     assert.ok(source.includes('run_or_echo mkdir -p "$BACKUP_DIR"'), 'mkdir should use argv form');
-    assert.ok(source.includes('run_or_echo rm -rf "$dest"'), 'rm should use argv form');
-    assert.ok(source.includes('run_or_echo cp -R "$skill_dir" "$dest"'), 'recursive copy should use argv form');
+    // Skills sync rm/cp calls were removed — Codex reads from ~/.agents/skills/ natively
+    assert.ok(!source.includes('run_or_echo rm -rf "$dest"'), 'skill sync rm should be removed');
+    assert.ok(!source.includes('run_or_echo cp -R "$skill_dir" "$dest"'), 'skill sync cp should be removed');
+  })) passed++; else failed++;
+
+  if (test('sync script avoids GNU-only grep -P parsing', () => {
+    assert.ok(!source.includes('grep -oP'), 'sync-ecc-to-codex.sh should remain portable across BSD and GNU environments');
+  })) passed++; else failed++;
+
+  if (test('extract_context7_key uses a portable parser', () => {
+    assert.ok(source.includes('extract_context7_key() {'), 'Expected extract_context7_key helper');
+    assert.ok(source.includes('node - "$file"'), 'extract_context7_key should use Node-based parsing');
   })) passed++; else failed++;
 
   console.log(`\nResults: Passed: ${passed}, Failed: ${failed}`);

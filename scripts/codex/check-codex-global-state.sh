@@ -8,10 +8,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 
+# Use rg if available, otherwise fall back to grep -E.
+# All patterns in this script must be POSIX ERE compatible.
+if command -v rg >/dev/null 2>&1; then
+  search_file() { rg -n "$1" "$2" >/dev/null 2>&1; }
+else
+  search_file() { grep -En "$1" "$2" >/dev/null 2>&1; }
+fi
+
 CONFIG_FILE="$CODEX_HOME/config.toml"
 AGENTS_FILE="$CODEX_HOME/AGENTS.md"
 PROMPTS_DIR="$CODEX_HOME/prompts"
-SKILLS_DIR="$CODEX_HOME/skills"
+SKILLS_DIR="${AGENTS_HOME:-$HOME/.agents}/skills"
 HOOKS_DIR_EXPECT="${ECC_GLOBAL_HOOKS_DIR:-$CODEX_HOME/git-hooks}"
 
 failures=0
@@ -48,7 +56,7 @@ require_file() {
 check_config_pattern() {
   local pattern="$1"
   local label="$2"
-  if rg -n "$pattern" "$CONFIG_FILE" >/dev/null 2>&1; then
+  if search_file "$pattern" "$CONFIG_FILE"; then
     ok "$label"
   else
     fail "$label"
@@ -58,7 +66,7 @@ check_config_pattern() {
 check_config_absent() {
   local pattern="$1"
   local label="$2"
-  if rg -n "$pattern" "$CONFIG_FILE" >/dev/null 2>&1; then
+  if search_file "$pattern" "$CONFIG_FILE"; then
     fail "$label"
   else
     ok "$label"
@@ -73,13 +81,13 @@ require_file "$CONFIG_FILE" "Global config.toml"
 require_file "$AGENTS_FILE" "Global AGENTS.md"
 
 if [[ -f "$AGENTS_FILE" ]]; then
-  if rg -n '^# Everything Claude Code \(ECC\) — Agent Instructions' "$AGENTS_FILE" >/dev/null 2>&1; then
+  if search_file '^# Everything Claude Code \(ECC\)' "$AGENTS_FILE"; then
     ok "AGENTS contains ECC root instructions"
   else
     fail "AGENTS missing ECC root instructions"
   fi
 
-  if rg -n '^# Codex Supplement \(From ECC \.codex/AGENTS\.md\)' "$AGENTS_FILE" >/dev/null 2>&1; then
+  if search_file '^# Codex Supplement \(From ECC \.codex/AGENTS\.md\)' "$AGENTS_FILE"; then
     ok "AGENTS contains ECC Codex supplement"
   else
     fail "AGENTS missing ECC Codex supplement"
@@ -87,29 +95,42 @@ if [[ -f "$AGENTS_FILE" ]]; then
 fi
 
 if [[ -f "$CONFIG_FILE" ]]; then
-  check_config_pattern '^multi_agent\s*=\s*true' "multi_agent is enabled"
-  check_config_absent '^\s*collab\s*=' "deprecated collab flag is absent"
-  check_config_pattern '^persistent_instructions\s*=' "persistent_instructions is configured"
+  check_config_pattern '^multi_agent[[:space:]]*=[[:space:]]*true' "multi_agent is enabled"
+  check_config_absent '^[[:space:]]*collab[[:space:]]*=' "deprecated collab flag is absent"
+  # persistent_instructions is recommended but optional; warn instead of fail
+  # so users who rely on AGENTS.md alone are not blocked (#967).
+  if search_file '^[[:space:]]*persistent_instructions[[:space:]]*=' "$CONFIG_FILE"; then
+    ok "persistent_instructions is configured"
+  else
+    warn "persistent_instructions is not set (recommended but optional)"
+  fi
   check_config_pattern '^\[profiles\.strict\]' "profiles.strict exists"
   check_config_pattern '^\[profiles\.yolo\]' "profiles.yolo exists"
 
+  # Current default connector set (docs/MCP-CONNECTOR-POLICY.md): exactly
+  # one connector. Former defaults (github, memory, sequential-thinking,
+  # context7, exa, ...) are opt-in user choices, so they are not required.
   for section in \
-    'mcp_servers.github' \
-    'mcp_servers.memory' \
-    'mcp_servers.sequential-thinking' \
-    'mcp_servers.context7-mcp'
+    'mcp_servers.chrome-devtools'
   do
-    if rg -n "^\[$section\]" "$CONFIG_FILE" >/dev/null 2>&1; then
+    if search_file "^\[$section\]" "$CONFIG_FILE"; then
       ok "MCP section [$section] exists"
     else
       fail "MCP section [$section] missing"
     fi
   done
 
-  if rg -n '^\[mcp_servers\.context7\]' "$CONFIG_FILE" >/dev/null 2>&1; then
-    warn "Duplicate [mcp_servers.context7] exists (context7-mcp is preferred)"
-  else
-    ok "No duplicate [mcp_servers.context7] section"
+  # ECC <= 2.0.0 emitted a url-only exa entry that Codex's stdio-only
+  # schema rejects, breaking the whole config (#2224). Flag it so users
+  # re-run the sync (which repairs it) or remove it manually.
+  if search_file '^\[mcp_servers\.exa\]' "$CONFIG_FILE"; then
+    exa_block="$(awk '/^\[mcp_servers\.exa\]/{flag=1;next}/^\[/{flag=0}flag' "$CONFIG_FILE")"
+    if printf '%s\n' "$exa_block" | grep -Eq '^[[:space:]]*url[[:space:]]*=' \
+      && ! printf '%s\n' "$exa_block" | grep -Eq '^[[:space:]]*command[[:space:]]*='; then
+      fail "MCP section [mcp_servers.exa] uses a url key, which Codex rejects for stdio servers — re-run ecc-sync-codex to repair (#2224)"
+    else
+      ok "MCP section [mcp_servers.exa] uses the stdio form"
+    fi
   fi
 fi
 
@@ -144,12 +165,12 @@ if [[ -d "$SKILLS_DIR" ]]; then
   done
 
   if [[ "$missing_skills" -eq 0 ]]; then
-    ok "All 16 ECC Codex skills are present"
+    ok "All 16 ECC skills are present in $SKILLS_DIR"
   else
-    fail "$missing_skills required skills are missing"
+    warn "$missing_skills ECC skills missing from $SKILLS_DIR (install via ECC installer or npx skills)"
   fi
 else
-  fail "Skills directory missing ($SKILLS_DIR)"
+  warn "Skills directory missing ($SKILLS_DIR) — install via ECC installer or npx skills"
 fi
 
 if [[ -f "$PROMPTS_DIR/ecc-prompts-manifest.txt" ]]; then

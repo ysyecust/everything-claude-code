@@ -129,7 +129,7 @@ All tests passed.
 | Files modified | 2 |
 | Remaining issues | 0 |
 
-Build Status: ✅ SUCCESS
+Build Status: PASS: SUCCESS
 ```
 
 ## Common Errors Fixed
@@ -165,7 +165,7 @@ The agent will stop and report if:
 
 - `/cpp-test` - Run tests after build succeeds
 - `/cpp-review` - Review code quality
-- `/verify` - Full verification loop
+- `verification-loop` skill - Full verification loop
 
 ## Related
 

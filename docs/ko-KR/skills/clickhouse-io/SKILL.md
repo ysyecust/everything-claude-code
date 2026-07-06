@@ -96,7 +96,7 @@ ORDER BY hour DESC;
 ### 효율적인 필터링
 
 ```sql
--- ✅ 좋음: 인덱스된 컬럼을 먼저 사용
+-- PASS: 좋음: 인덱스된 컬럼을 먼저 사용
 SELECT *
 FROM markets_analytics
 WHERE date >= '2025-01-01'
@@ -105,7 +105,7 @@ WHERE date >= '2025-01-01'
 ORDER BY date DESC
 LIMIT 100;
 
--- ❌ 나쁨: 비인덱스 컬럼을 먼저 필터링
+-- FAIL: 나쁨: 비인덱스 컬럼을 먼저 필터링
 SELECT *
 FROM markets_analytics
 WHERE volume > 1000
@@ -116,7 +116,7 @@ WHERE volume > 1000
 ### 집계
 
 ```sql
--- ✅ 좋음: ClickHouse 전용 집계 함수를 사용
+-- PASS: 좋음: ClickHouse 전용 집계 함수를 사용
 SELECT
     toStartOfDay(created_at) AS day,
     market_id,
@@ -129,7 +129,7 @@ WHERE created_at >= today() - INTERVAL 7 DAY
 GROUP BY day, market_id
 ORDER BY day DESC, total_volume DESC;
 
--- ✅ 백분위수에는 quantile 사용 (percentile보다 효율적)
+-- PASS: 백분위수에는 quantile 사용 (percentile보다 효율적)
 SELECT
     quantile(0.50)(trade_size) AS median,
     quantile(0.95)(trade_size) AS p95,
@@ -161,36 +161,43 @@ ORDER BY market_id, date;
 ### 배치 삽입 (권장)
 
 ```typescript
-import { ClickHouse } from 'clickhouse'
+import { createClient } from '@clickhouse/client'
 
-const clickhouse = new ClickHouse({
-  url: process.env.CLICKHOUSE_URL,
-  port: 8123,
-  basicAuth: {
-    username: process.env.CLICKHOUSE_USER,
-    password: process.env.CLICKHOUSE_PASSWORD
-  }
+const clickhouse = createClient({
+  url: process.env.CLICKHOUSE_URL ?? 'http://localhost:8123',
+  username: process.env.CLICKHOUSE_USER,
+  password: process.env.CLICKHOUSE_PASSWORD
 })
 
-// ✅ 배치 삽입 (효율적)
+// PASS: 배치 삽입 (효율적)
 async function bulkInsertTrades(trades: Trade[]) {
-  const rows = trades.map(trade => ({
-    id: trade.id,
-    market_id: trade.market_id,
-    user_id: trade.user_id,
-    amount: trade.amount,
-    timestamp: trade.timestamp.toISOString()
-  }))
-
-  await clickhouse.insert('trades', rows)
+  await clickhouse.insert({
+    table: 'trades',
+    values: trades.map(trade => ({
+      id: trade.id,
+      market_id: trade.market_id,
+      user_id: trade.user_id,
+      amount: trade.amount,
+      timestamp: trade.timestamp.toISOString()
+    })),
+    format: 'JSONEachRow'
+  })
 }
 
-// ❌ 개별 삽입 (느림)
+// FAIL: 개별 삽입 (느림)
 async function insertTrade(trade: Trade) {
   // 루프 안에서 이렇게 하지 마세요!
-  await clickhouse.query(`
-    INSERT INTO trades VALUES ('${trade.id}', ...)
-  `).toPromise()
+  await clickhouse.insert({
+    table: 'trades',
+    values: [{
+      id: trade.id,
+      market_id: trade.market_id,
+      user_id: trade.user_id,
+      amount: trade.amount,
+      timestamp: trade.timestamp.toISOString()
+    }],
+    format: 'JSONEachRow'
+  })
 }
 ```
 
@@ -198,17 +205,14 @@ async function insertTrade(trade: Trade) {
 
 ```typescript
 // 연속적인 데이터 수집용
-import { createWriteStream } from 'fs'
-import { pipeline } from 'stream/promises'
+import { Readable } from 'node:stream'
 
-async function streamInserts() {
-  const stream = clickhouse.insert('trades').stream()
-
-  for await (const batch of dataSource) {
-    stream.write(batch)
-  }
-
-  await stream.end()
+async function streamInserts(dataSource: AsyncIterable<Record<string, unknown>>) {
+  await clickhouse.insert({
+    table: 'trades',
+    values: Readable.from(dataSource, { objectMode: true }),
+    format: 'JSONEachRow'
+  })
 }
 ```
 
@@ -404,14 +408,18 @@ pgClient.query('LISTEN market_updates')
 pgClient.on('notification', async (msg) => {
   const update = JSON.parse(msg.payload)
 
-  await clickhouse.insert('market_updates', [
-    {
-      market_id: update.id,
-      event_type: update.operation,  // INSERT, UPDATE, DELETE
-      timestamp: new Date(),
-      data: JSON.stringify(update.new_data)
-    }
-  ])
+  await clickhouse.insert({
+    table: 'market_updates',
+    values: [
+      {
+        market_id: update.id,
+        event_type: update.operation,  // INSERT, UPDATE, DELETE
+        timestamp: new Date(),
+        data: JSON.stringify(update.new_data)
+      }
+    ],
+    format: 'JSONEachRow'
+  })
 })
 ```
 

@@ -1,12 +1,17 @@
 ---
 name: coding-standards
-description: Universal coding standards, best practices, and patterns for TypeScript, JavaScript, React, and Node.js development.
-origin: ECC
+description: Baseline cross-project coding conventions for naming, readability, immutability, and code-quality review. Use detailed frontend or backend skills for framework-specific patterns.
 ---
 
 # Coding Standards & Best Practices
 
-Universal coding standards applicable across all projects.
+Baseline coding conventions applicable across projects.
+
+This skill is the shared floor, not the detailed framework playbook.
+
+- Use `frontend-patterns` for React, state, forms, rendering, and UI architecture.
+- Use `backend-patterns` or `api-design` for repository/service layers, endpoint design, validation, and server-specific concerns.
+- Use `rules/common/coding-style.md` when you need the shortest reusable rule layer instead of a full skill walkthrough.
 
 ## When to Activate
 
@@ -16,6 +21,19 @@ Universal coding standards applicable across all projects.
 - Enforcing naming, formatting, or structural consistency
 - Setting up linting, formatting, or type-checking rules
 - Onboarding new contributors to coding conventions
+
+## Scope Boundaries
+
+Activate this skill for:
+- descriptive naming
+- immutability defaults
+- readability, KISS, DRY, and YAGNI enforcement
+- error-handling expectations and code-smell review
+
+Do not use this skill as the primary source for:
+- React composition, hooks, or rendering patterns
+- backend architecture, API design, or database layering
+- domain-specific framework guidance when a narrower ECC skill already exists
 
 ## Code Quality Principles
 
@@ -48,12 +66,12 @@ Universal coding standards applicable across all projects.
 ### Variable Naming
 
 ```typescript
-// ✅ GOOD: Descriptive names
+// PASS: GOOD: Descriptive names
 const marketSearchQuery = 'election'
 const isUserAuthenticated = true
 const totalRevenue = 1000
 
-// ❌ BAD: Unclear names
+// FAIL: BAD: Unclear names
 const q = 'election'
 const flag = true
 const x = 1000
@@ -62,12 +80,12 @@ const x = 1000
 ### Function Naming
 
 ```typescript
-// ✅ GOOD: Verb-noun pattern
+// PASS: GOOD: Verb-noun pattern
 async function fetchMarketData(marketId: string) { }
 function calculateSimilarity(a: number[], b: number[]) { }
 function isValidEmail(email: string): boolean { }
 
-// ❌ BAD: Unclear or noun-only
+// FAIL: BAD: Unclear or noun-only
 async function market(id: string) { }
 function similarity(a, b) { }
 function email(e) { }
@@ -76,7 +94,7 @@ function email(e) { }
 ### Immutability Pattern (CRITICAL)
 
 ```typescript
-// ✅ ALWAYS use spread operator
+// PASS: ALWAYS use spread operator
 const updatedUser = {
   ...user,
   name: 'New Name'
@@ -84,7 +102,7 @@ const updatedUser = {
 
 const updatedArray = [...items, newItem]
 
-// ❌ NEVER mutate directly
+// FAIL: NEVER mutate directly
 user.name = 'New Name'  // BAD
 items.push(newItem)     // BAD
 ```
@@ -92,7 +110,7 @@ items.push(newItem)     // BAD
 ### Error Handling
 
 ```typescript
-// ✅ GOOD: Comprehensive error handling
+// PASS: GOOD: Comprehensive error handling
 async function fetchData(url: string) {
   try {
     const response = await fetch(url)
@@ -108,7 +126,7 @@ async function fetchData(url: string) {
   }
 }
 
-// ❌ BAD: No error handling
+// FAIL: BAD: No error handling
 async function fetchData(url) {
   const response = await fetch(url)
   return response.json()
@@ -118,14 +136,14 @@ async function fetchData(url) {
 ### Async/Await Best Practices
 
 ```typescript
-// ✅ GOOD: Parallel execution when possible
+// PASS: GOOD: Parallel execution when possible
 const [users, markets, stats] = await Promise.all([
   fetchUsers(),
   fetchMarkets(),
   fetchStats()
 ])
 
-// ❌ BAD: Sequential when unnecessary
+// FAIL: BAD: Sequential when unnecessary
 const users = await fetchUsers()
 const markets = await fetchMarkets()
 const stats = await fetchStats()
@@ -134,7 +152,7 @@ const stats = await fetchStats()
 ### Type Safety
 
 ```typescript
-// ✅ GOOD: Proper types
+// PASS: GOOD: Proper types
 interface Market {
   id: string
   name: string
@@ -146,7 +164,7 @@ function getMarket(id: string): Promise<Market> {
   // Implementation
 }
 
-// ❌ BAD: Using 'any'
+// FAIL: BAD: Using 'any'
 function getMarket(id: any): Promise<any> {
   // Implementation
 }
@@ -157,7 +175,7 @@ function getMarket(id: any): Promise<any> {
 ### Component Structure
 
 ```typescript
-// ✅ GOOD: Functional component with types
+// PASS: GOOD: Functional component with types
 interface ButtonProps {
   children: React.ReactNode
   onClick: () => void
@@ -182,7 +200,7 @@ export function Button({
   )
 }
 
-// ❌ BAD: No types, unclear structure
+// FAIL: BAD: No types, unclear structure
 export function Button(props) {
   return <button onClick={props.onClick}>{props.children}</button>
 }
@@ -191,7 +209,7 @@ export function Button(props) {
 ### Custom Hooks
 
 ```typescript
-// ✅ GOOD: Reusable custom hook
+// PASS: GOOD: Reusable custom hook
 export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
 
@@ -213,25 +231,25 @@ const debouncedQuery = useDebounce(searchQuery, 500)
 ### State Management
 
 ```typescript
-// ✅ GOOD: Proper state updates
+// PASS: GOOD: Proper state updates
 const [count, setCount] = useState(0)
 
 // Functional update for state based on previous state
 setCount(prev => prev + 1)
 
-// ❌ BAD: Direct state reference
+// FAIL: BAD: Direct state reference
 setCount(count + 1)  // Can be stale in async scenarios
 ```
 
 ### Conditional Rendering
 
 ```typescript
-// ✅ GOOD: Clear conditional rendering
+// PASS: GOOD: Clear conditional rendering
 {isLoading && <Spinner />}
 {error && <ErrorMessage error={error} />}
 {data && <DataDisplay data={data} />}
 
-// ❌ BAD: Ternary hell
+// FAIL: BAD: Ternary hell
 {isLoading ? <Spinner /> : error ? <ErrorMessage error={error} /> : data ? <DataDisplay data={data} /> : null}
 ```
 
@@ -254,7 +272,7 @@ GET /api/markets?status=active&limit=10&offset=0
 ### Response Format
 
 ```typescript
-// ✅ GOOD: Consistent response structure
+// PASS: GOOD: Consistent response structure
 interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -285,7 +303,7 @@ return NextResponse.json({
 ```typescript
 import { z } from 'zod'
 
-// ✅ GOOD: Schema validation
+// PASS: GOOD: Schema validation
 const CreateMarketSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
@@ -348,14 +366,14 @@ types/market.types.ts         # camelCase with .types suffix
 ### When to Comment
 
 ```typescript
-// ✅ GOOD: Explain WHY, not WHAT
+// PASS: GOOD: Explain WHY, not WHAT
 // Use exponential backoff to avoid overwhelming the API during outages
 const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
 
 // Deliberately using mutation here for performance with large arrays
 items.push(newItem)
 
-// ❌ BAD: Stating the obvious
+// FAIL: BAD: Stating the obvious
 // Increment counter by 1
 count++
 
@@ -395,12 +413,13 @@ export async function searchMarkets(
 ```typescript
 import { useMemo, useCallback } from 'react'
 
-// ✅ GOOD: Memoize expensive computations
+// PASS: GOOD: Memoize expensive computations
+// Copy before sorting - Array.prototype.sort mutates in place
 const sortedMarkets = useMemo(() => {
-  return markets.sort((a, b) => b.volume - a.volume)
+  return [...markets].sort((a, b) => b.volume - a.volume)
 }, [markets])
 
-// ✅ GOOD: Memoize callbacks
+// PASS: GOOD: Memoize callbacks
 const handleSearch = useCallback((query: string) => {
   setSearchQuery(query)
 }, [])
@@ -411,7 +430,7 @@ const handleSearch = useCallback((query: string) => {
 ```typescript
 import { lazy, Suspense } from 'react'
 
-// ✅ GOOD: Lazy load heavy components
+// PASS: GOOD: Lazy load heavy components
 const HeavyChart = lazy(() => import('./HeavyChart'))
 
 export function Dashboard() {
@@ -426,13 +445,13 @@ export function Dashboard() {
 ### Database Queries
 
 ```typescript
-// ✅ GOOD: Select only needed columns
+// PASS: GOOD: Select only needed columns
 const { data } = await supabase
   .from('markets')
   .select('id, name, status')
   .limit(10)
 
-// ❌ BAD: Select everything
+// FAIL: BAD: Select everything
 const { data } = await supabase
   .from('markets')
   .select('*')
@@ -459,12 +478,12 @@ test('calculates similarity correctly', () => {
 ### Test Naming
 
 ```typescript
-// ✅ GOOD: Descriptive test names
+// PASS: GOOD: Descriptive test names
 test('returns empty array when no markets match query', () => { })
 test('throws error when OpenAI API key is missing', () => { })
 test('falls back to substring search when Redis unavailable', () => { })
 
-// ❌ BAD: Vague test names
+// FAIL: BAD: Vague test names
 test('works', () => { })
 test('test search', () => { })
 ```
@@ -475,12 +494,12 @@ Watch for these anti-patterns:
 
 ### 1. Long Functions
 ```typescript
-// ❌ BAD: Function > 50 lines
+// FAIL: BAD: Function > 50 lines
 function processMarketData() {
   // 100 lines of code
 }
 
-// ✅ GOOD: Split into smaller functions
+// PASS: GOOD: Split into smaller functions
 function processMarketData() {
   const validated = validateData()
   const transformed = transformData(validated)
@@ -490,7 +509,7 @@ function processMarketData() {
 
 ### 2. Deep Nesting
 ```typescript
-// ❌ BAD: 5+ levels of nesting
+// FAIL: BAD: 5+ levels of nesting
 if (user) {
   if (user.isAdmin) {
     if (market) {
@@ -503,7 +522,7 @@ if (user) {
   }
 }
 
-// ✅ GOOD: Early returns
+// PASS: GOOD: Early returns
 if (!user) return
 if (!user.isAdmin) return
 if (!market) return
@@ -515,11 +534,11 @@ if (!hasPermission) return
 
 ### 3. Magic Numbers
 ```typescript
-// ❌ BAD: Unexplained numbers
+// FAIL: BAD: Unexplained numbers
 if (retryCount > 3) { }
 setTimeout(callback, 500)
 
-// ✅ GOOD: Named constants
+// PASS: GOOD: Named constants
 const MAX_RETRIES = 3
 const DEBOUNCE_DELAY_MS = 500
 

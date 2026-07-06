@@ -1,5 +1,5 @@
 /**
- * Everything Claude Code (ECC) Plugin Hooks for OpenCode
+ * ECC Plugin Hooks for OpenCode
  *
  * This plugin translates Claude Code hooks to OpenCode's plugin system.
  * OpenCode's plugin system is MORE sophisticated than Claude Code with 20+ events
@@ -14,8 +14,64 @@
  */
 
 import type { PluginInput } from "@opencode-ai/plugin"
+import * as fs from "fs"
+import * as path from "path"
+import {
+  initStore,
+  recordChange,
+  clearChanges,
+} from "./lib/changed-files-store.js"
+import changedFilesTool from "../tools/changed-files.js"
+import dependencyAnalyzerTool from "../tools/dependency-analyzer.js"
 
-export const ECCHooksPlugin = async ({
+/**
+ * Type definitions for better type safety
+ */
+interface ToolArgs {
+  filePath?: string
+  file_path?: string
+  path?: string
+  command?: string
+  [key: string]: unknown
+}
+
+interface ToolInput {
+  tool: string
+  callID?: string
+  args?: ToolArgs
+}
+
+interface PermissionEvent {
+  tool: string
+  args: unknown
+}
+
+interface FileEvent {
+  path: string
+  type?: string
+}
+
+interface TodoEvent {
+  todos: Array<{ text: string; done: boolean }>
+}
+
+/**
+ * Read ECC version from package.json
+ * Falls back to a default if package.json cannot be read
+ */
+function getECCVersion(): string {
+  try {
+    const packageJsonPath = path.resolve(__dirname, "../../package.json")
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"))
+    return packageJson.version || "2.0.0"
+  } catch {
+    return "2.0.0"
+  }
+}
+
+type ECCHooksPluginFn = (input: PluginInput) => Promise<Record<string, unknown>>
+
+export const ECCHooksPlugin: ECCHooksPluginFn = async ({
   client,
   $,
   directory,
@@ -23,8 +79,32 @@ export const ECCHooksPlugin = async ({
 }: PluginInput) => {
   type HookProfile = "minimal" | "standard" | "strict"
 
-  // Track files edited in current session for console.log audit
+  const worktreePath = worktree || directory
+  initStore(worktreePath)
+
   const editedFiles = new Set<string>()
+
+  function resolvePath(p: string): string {
+    if (path.isAbsolute(p)) return p
+    return path.join(worktreePath, p)
+  }
+
+  function hasProjectFile(relativePath: string): boolean {
+    try {
+      return fs.statSync(resolvePath(relativePath)).isFile()
+    } catch {
+      return false
+    }
+  }
+
+  const pendingToolChanges = new Map<string, { path: string; type: "added" | "modified" }>()
+  let writeCounter = 0
+
+  function getFilePath(args: ToolArgs | undefined): string | null {
+    if (!args) return null
+    const p = (args.filePath ?? args.file_path ?? args.path) as string | undefined
+    return typeof p === "string" && p.trim() ? p : null
+  }
 
   // Helper to call the SDK's log API with correct signature
   const log = (level: "debug" | "info" | "warn" | "error", message: string) =>
@@ -73,16 +153,18 @@ export const ECCHooksPlugin = async ({
      * Action: Runs prettier --write on the file
      */
     "file.edited": async (event: { path: string }) => {
-      // Track edited files for console.log audit
       editedFiles.add(event.path)
+      recordChange(event.path, "modified")
 
       // Auto-format JS/TS files
       if (hookEnabled("post:edit:format", ["strict"]) && event.path.match(/\.(ts|tsx|js|jsx)$/)) {
         try {
           await $`prettier --write ${event.path} 2>/dev/null`
           log("info", `[ECC] Formatted: ${event.path}`)
-        } catch {
-          // Prettier not installed or failed - silently continue
+        } catch (error: unknown) {
+          // Prettier not installed or failed - log but continue
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          log("debug", `[ECC] Prettier formatting failed for ${event.path}: ${errorMessage}`)
         }
       }
 
@@ -111,9 +193,24 @@ export const ECCHooksPlugin = async ({
      * Action: Runs tsc --noEmit to check for type errors
      */
     "tool.execute.after": async (
-      input: { tool: string; args?: { filePath?: string } },
+      input: ToolInput,
       output: unknown
     ) => {
+      const filePath = getFilePath(input.args)
+      if (input.tool === "edit" && filePath) {
+        recordChange(filePath, "modified")
+      }
+      if (input.tool === "write" && filePath) {
+        const key = input.callID ?? `write-${++writeCounter}-${filePath}`
+        const pending = pendingToolChanges.get(key)
+        if (pending) {
+          recordChange(pending.path, pending.type)
+          pendingToolChanges.delete(key)
+        } else {
+          recordChange(filePath, "modified")
+        }
+      }
+
       // Check if a TypeScript file was edited
       if (
         hookEnabled("post:edit:typecheck", ["strict"]) &&
@@ -152,8 +249,25 @@ export const ECCHooksPlugin = async ({
      * Action: Warns about potential security issues
      */
     "tool.execute.before": async (
-      input: { tool: string; args?: Record<string, unknown> }
+      input: ToolInput
     ) => {
+      if (input.tool === "write") {
+        const filePath = getFilePath(input.args)
+        if (filePath) {
+          const absPath = resolvePath(filePath)
+          let type: "added" | "modified" = "modified"
+          try {
+            if (typeof fs.existsSync === "function") {
+              type = fs.existsSync(absPath) ? "modified" : "added"
+            }
+          } catch {
+            type = "modified"
+          }
+          const key = input.callID ?? `write-${++writeCounter}-${filePath}`
+          pendingToolChanges.set(key, { path: filePath, type })
+        }
+      }
+
       // Git push review reminder
       if (
         hookEnabled("pre:bash:git-push-reminder", "strict") &&
@@ -217,13 +331,8 @@ export const ECCHooksPlugin = async ({
       log("info", `[ECC] Session started - profile=${currentProfile}`)
 
       // Check for project-specific context files
-      try {
-        const hasClaudeMd = await $`test -f ${worktree}/CLAUDE.md && echo "yes"`.text()
-        if (hasClaudeMd.trim() === "yes") {
-          log("info", "[ECC] Found CLAUDE.md - loading project context")
-        }
-      } catch {
-        // No CLAUDE.md found
+      if (hasProjectFile("CLAUDE.md")) {
+        log("info", "[ECC] Found CLAUDE.md - loading project context")
       }
     },
 
@@ -271,11 +380,22 @@ export const ECCHooksPlugin = async ({
         log("info", "[ECC] Audit passed: No console.log statements found")
       }
 
-      // Desktop notification (macOS)
+      // Desktop notification (cross-platform)
       try {
-        await $`osascript -e 'display notification "Task completed!" with title "OpenCode ECC"' 2>/dev/null`
-      } catch {
-        // Notification not supported or failed
+        if (process.platform === "darwin") {
+          // macOS
+          await $`osascript -e 'display notification "Task completed!" with title "OpenCode ECC"' 2>/dev/null`
+        } else if (process.platform === "win32") {
+          // Windows - PowerShell notification
+          await $`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Task completed!', 'OpenCode ECC', 'OK', 'Information')" 2>/dev/null`
+        } else if (process.platform === "linux") {
+          // Linux - notify-send (requires libnotify)
+          await $`notify-send "OpenCode ECC" "Task completed!" 2>/dev/null`
+        }
+      } catch (error: unknown) {
+        // Notification not supported or failed - log but continue
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log("debug", `[ECC] Desktop notification failed: ${errorMessage}`)
       }
 
       // Clear tracked files for next task
@@ -293,6 +413,8 @@ export const ECCHooksPlugin = async ({
       if (!hookEnabled("session:end-marker", ["minimal", "standard", "strict"])) return
       log("info", "[ECC] Session ended - cleaning up")
       editedFiles.clear()
+      clearChanges()
+      pendingToolChanges.clear()
     },
 
     /**
@@ -303,6 +425,10 @@ export const ECCHooksPlugin = async ({
      * Action: Updates tracking
      */
     "file.watcher.updated": async (event: { path: string; type: string }) => {
+      let changeType: "added" | "modified" | "deleted" = "modified"
+      if (event.type === "create" || event.type === "add") changeType = "added"
+      else if (event.type === "delete" || event.type === "remove") changeType = "deleted"
+      recordChange(event.path, changeType)
       if (event.type === "change" && event.path.match(/\.(ts|tsx|js|jsx)$/)) {
         editedFiles.add(event.path)
       }
@@ -332,11 +458,11 @@ export const ECCHooksPlugin = async ({
      */
     "shell.env": async () => {
       const env: Record<string, string> = {
-        ECC_VERSION: "1.8.0",
+        ECC_VERSION: getECCVersion(),
         ECC_PLUGIN: "true",
         ECC_HOOK_PROFILE: currentProfile,
         ECC_DISABLED_HOOKS: process.env.ECC_DISABLED_HOOKS || "",
-        PROJECT_ROOT: worktree || directory,
+        PROJECT_ROOT: worktreePath,
       }
 
       // Detect package manager
@@ -347,12 +473,9 @@ export const ECCHooksPlugin = async ({
         "package-lock.json": "npm",
       }
       for (const [lockfile, pm] of Object.entries(lockfiles)) {
-        try {
-          await $`test -f ${worktree}/${lockfile}`
+        if (hasProjectFile(lockfile)) {
           env.PACKAGE_MANAGER = pm
           break
-        } catch {
-          // Not found, try next
         }
       }
 
@@ -366,11 +489,8 @@ export const ECCHooksPlugin = async ({
       }
       const detected: string[] = []
       for (const [file, lang] of Object.entries(langDetectors)) {
-        try {
-          await $`test -f ${worktree}/${file}`
+        if (hasProjectFile(file)) {
           detected.push(lang)
-        } catch {
-          // Not found
         }
       }
       if (detected.length > 0) {
@@ -392,9 +512,9 @@ export const ECCHooksPlugin = async ({
       const contextBlock = [
         "# ECC Context (preserve across compaction)",
         "",
-        "## Active Plugin: Everything Claude Code v1.8.0",
+        "## Active Plugin: ECC v2.0.0",
         "- Hooks: file.edited, tool.execute.before/after, session.created/idle/deleted, shell.env, compacting, permission.ask",
-        "- Tools: run-tests, check-coverage, security-audit, format-code, lint-check, git-summary",
+        "- Tools: run-tests, check-coverage, security-audit, format-code, lint-check, git-summary, changed-files",
         "- Agents: 13 specialized (planner, architect, tdd-guide, code-reviewer, security-reviewer, build-error-resolver, e2e-runner, refactor-cleaner, doc-updater, go-reviewer, go-build-resolver, database-reviewer, python-reviewer)",
         "",
         "## Key Principles",
@@ -426,28 +546,52 @@ export const ECCHooksPlugin = async ({
      * Triggers: When permission is requested
      * Action: Auto-approve reads, formatters, and test commands; log all for audit
      */
-    "permission.ask": async (event: { tool: string; args: unknown }) => {
+    "permission.ask": async (event: PermissionEvent) => {
       log("info", `[ECC] Permission requested for: ${event.tool}`)
 
-      const cmd = String((event.args as Record<string, unknown>)?.command || event.args || "")
+      try {
+        // Handle both string args and object args with command property
+        let cmd: string
+        if (typeof event.args === "string") {
+          cmd = event.args
+        } else if (event.args && typeof event.args === "object") {
+          cmd = String((event.args as Record<string, unknown>).command || "")
+        } else {
+          cmd = String(event.args || "")
+        }
 
-      // Auto-approve: read/search tools
-      if (["read", "glob", "grep", "search", "list"].includes(event.tool)) {
-        return { approved: true, reason: "Read-only operation" }
+        // Auto-approve: read/search tools
+        if (["read", "glob", "grep", "search", "list"].includes(event.tool)) {
+          log("debug", `[ECC] Auto-approved read-only tool: ${event.tool}`)
+          return { approved: true, reason: "Read-only operation" }
+        }
+
+        // Auto-approve: formatters
+        if (event.tool === "bash" && /^(npx )?(@biomejs\/biome|prettier|black|gofmt|rustfmt|swift-format)/.test(cmd)) {
+          log("debug", `[ECC] Auto-approved formatter: ${cmd}`)
+          return { approved: true, reason: "Formatter execution" }
+        }
+
+        // Auto-approve: test execution
+        if (event.tool === "bash" && /^(npm test|npx vitest|npx jest|pytest|go test|cargo test)/.test(cmd)) {
+          log("debug", `[ECC] Auto-approved test execution: ${cmd}`)
+          return { approved: true, reason: "Test execution" }
+        }
+
+        // Everything else: let user decide
+        log("debug", `[ECC] Permission requires user approval: ${event.tool}`)
+        return { approved: undefined }
+      } catch (error: unknown) {
+        // Error in permission handling - log and deny for safety
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log("error", `[ECC] Permission handling error for ${event.tool}: ${errorMessage}`)
+        return { approved: false, reason: `Error: ${errorMessage}` }
       }
+    },
 
-      // Auto-approve: formatters
-      if (event.tool === "bash" && /^(npx )?(prettier|biome|black|gofmt|rustfmt|swift-format)/.test(cmd)) {
-        return { approved: true, reason: "Formatter execution" }
-      }
-
-      // Auto-approve: test execution
-      if (event.tool === "bash" && /^(npm test|npx vitest|npx jest|pytest|go test|cargo test)/.test(cmd)) {
-        return { approved: true, reason: "Test execution" }
-      }
-
-      // Everything else: let user decide
-      return { approved: undefined }
+    tool: {
+      "changed-files": changedFilesTool,
+      "dependency-analyzer": dependencyAnalyzerTool,
     },
   }
 }

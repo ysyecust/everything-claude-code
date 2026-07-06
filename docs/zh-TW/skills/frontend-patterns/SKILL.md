@@ -12,7 +12,7 @@ description: Frontend development patterns for React, Next.js, state management,
 ### 組合優於繼承
 
 ```typescript
-// ✅ 良好：元件組合
+// PASS: 良好：元件組合
 interface CardProps {
   children: React.ReactNode
   variant?: 'default' | 'outlined'
@@ -158,28 +158,41 @@ export function useQuery<T>(
   const [error, setError] = useState<Error | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // 將最新的 fetcher/options 保存在 ref 中，讓 refetch 即使在呼叫端
+  // 傳入行內函式與物件字面值時也能保持參照穩定。
+  // 若沒有這麼做，每次渲染都會建立新的 refetch，下方的 effect 會在
+  // 每次狀態更新後重新執行，造成無限取得迴圈。
+  const fetcherRef = useRef(fetcher)
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    fetcherRef.current = fetcher
+    optionsRef.current = options
+  })
+
   const refetch = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const result = await fetcher()
+      const result = await fetcherRef.current()
       setData(result)
-      options?.onSuccess?.(result)
+      optionsRef.current?.onSuccess?.(result)
     } catch (err) {
       const error = err as Error
       setError(error)
-      options?.onError?.(error)
+      optionsRef.current?.onError?.(error)
     } finally {
       setLoading(false)
     }
-  }, [fetcher, options])
+  }, [])
+
+  const enabled = options?.enabled !== false
 
   useEffect(() => {
-    if (options?.enabled !== false) {
+    if (enabled) {
       refetch()
     }
-  }, [key, refetch, options?.enabled])
+  }, [key, enabled, refetch])
 
   return { data, error, loading, refetch }
 }
@@ -283,17 +296,18 @@ export function useMarkets() {
 ### 記憶化
 
 ```typescript
-// ✅ useMemo 用於昂貴計算
+// PASS: useMemo 用於昂貴計算
+// 排序前先複製 - Array.prototype.sort 會就地修改陣列
 const sortedMarkets = useMemo(() => {
-  return markets.sort((a, b) => b.volume - a.volume)
+  return [...markets].sort((a, b) => b.volume - a.volume)
 }, [markets])
 
-// ✅ useCallback 用於傳遞給子元件的函式
+// PASS: useCallback 用於傳遞給子元件的函式
 const handleSearch = useCallback((query: string) => {
   setSearchQuery(query)
 }, [])
 
-// ✅ React.memo 用於純元件
+// PASS: React.memo 用於純元件
 export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
   return (
     <div className="market-card">
@@ -309,7 +323,7 @@ export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
 ```typescript
 import { lazy, Suspense } from 'react'
 
-// ✅ 延遲載入重型元件
+// PASS: 延遲載入重型元件
 const HeavyChart = lazy(() => import('./HeavyChart'))
 const ThreeJsBackground = lazy(() => import('./ThreeJsBackground'))
 
@@ -504,7 +518,7 @@ export class ErrorBoundary extends React.Component<
 ```typescript
 import { motion, AnimatePresence } from 'framer-motion'
 
-// ✅ 列表動畫
+// PASS: 列表動畫
 export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   return (
     <AnimatePresence>
@@ -523,7 +537,7 @@ export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   )
 }
 
-// ✅ Modal 動畫
+// PASS: Modal 動畫
 export function Modal({ isOpen, onClose, children }: ModalProps) {
   return (
     <AnimatePresence>

@@ -1,7 +1,8 @@
 ---
 name: frontend-patterns
 description: Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Frontend Development Patterns
@@ -23,7 +24,7 @@ Modern frontend patterns for React, Next.js, and performant user interfaces.
 ### Composition Over Inheritance
 
 ```typescript
-// ✅ GOOD: Component composition
+// PASS: GOOD: Component composition
 interface CardProps {
   children: React.ReactNode
   variant?: 'default' | 'outlined'
@@ -169,28 +170,41 @@ export function useQuery<T>(
   const [error, setError] = useState<Error | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Keep the latest fetcher/options in refs so refetch stays referentially
+  // stable even when callers pass inline functions and object literals.
+  // Without this, every render creates a new refetch, and the effect below
+  // re-runs after each state update - an infinite fetch loop.
+  const fetcherRef = useRef(fetcher)
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    fetcherRef.current = fetcher
+    optionsRef.current = options
+  })
+
   const refetch = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const result = await fetcher()
+      const result = await fetcherRef.current()
       setData(result)
-      options?.onSuccess?.(result)
+      optionsRef.current?.onSuccess?.(result)
     } catch (err) {
       const error = err as Error
       setError(error)
-      options?.onError?.(error)
+      optionsRef.current?.onError?.(error)
     } finally {
       setLoading(false)
     }
-  }, [fetcher, options])
+  }, [])
+
+  const enabled = options?.enabled !== false
 
   useEffect(() => {
-    if (options?.enabled !== false) {
+    if (enabled) {
       refetch()
     }
-  }, [key, refetch, options?.enabled])
+  }, [key, enabled, refetch])
 
   return { data, error, loading, refetch }
 }
@@ -294,17 +308,18 @@ export function useMarkets() {
 ### Memoization
 
 ```typescript
-// ✅ useMemo for expensive computations
+// PASS: useMemo for expensive computations
+// Copy before sorting - Array.prototype.sort mutates in place
 const sortedMarkets = useMemo(() => {
-  return markets.sort((a, b) => b.volume - a.volume)
+  return [...markets].sort((a, b) => b.volume - a.volume)
 }, [markets])
 
-// ✅ useCallback for functions passed to children
+// PASS: useCallback for functions passed to children
 const handleSearch = useCallback((query: string) => {
   setSearchQuery(query)
 }, [])
 
-// ✅ React.memo for pure components
+// PASS: React.memo for pure components
 export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
   return (
     <div className="market-card">
@@ -320,7 +335,7 @@ export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
 ```typescript
 import { lazy, Suspense } from 'react'
 
-// ✅ Lazy load heavy components
+// PASS: Lazy load heavy components
 const HeavyChart = lazy(() => import('./HeavyChart'))
 const ThreeJsBackground = lazy(() => import('./ThreeJsBackground'))
 
@@ -515,7 +530,7 @@ export class ErrorBoundary extends React.Component<
 ```typescript
 import { motion, AnimatePresence } from 'framer-motion'
 
-// ✅ List animations
+// PASS: List animations
 export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   return (
     <AnimatePresence>
@@ -534,7 +549,7 @@ export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   )
 }
 
-// ✅ Modal animations
+// PASS: Modal animations
 export function Modal({ isOpen, onClose, children }: ModalProps) {
   return (
     <AnimatePresence>

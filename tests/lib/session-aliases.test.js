@@ -48,6 +48,7 @@ function resetAliases() {
 }
 
 function runTests() {
+  const rocketEmoji = String.fromCodePoint(0x1F680);
   console.log('\n=== Testing session-aliases.js ===\n');
 
   let passed = 0;
@@ -1229,12 +1230,8 @@ function runTests() {
     // session-aliases.js lines 131-137: When saveAliases fails (outer catch),
     // it tries to restore from backup. If the restore ALSO fails, the inner
     // catch at line 135 logs restoreErr. No existing test creates this double-fault.
-    if (process.platform === 'win32') {
-      console.log('    (skipped — chmod not reliable on Windows)');
-      return;
-    }
-    if (process.getuid && process.getuid() === 0) {
-      console.log('    (skipped — chmod restrictions do not apply to root)');
+    if (process.platform === 'win32' || process.getuid?.() === 0) {
+      console.log('    (skipped — chmod ineffective on Windows/root)');
       return;
     }
     const isoHome = path.join(os.tmpdir(), `ecc-r90-restore-fail-${Date.now()}`);
@@ -1445,7 +1442,7 @@ function runTests() {
       'CJK characters should be rejected');
 
     // Emoji
-    const emojiResult = aliases.resolveAlias('rocket-🚀');
+    const emojiResult = aliases.resolveAlias(`rocket-${rocketEmoji}`);
     assert.strictEqual(emojiResult, null,
       'Emoji should be rejected by the ASCII-only regex');
 

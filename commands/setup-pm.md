@@ -1,75 +1,80 @@
 ---
-description: Configure your preferred C++ build system (CMake/Make) and compiler (GCC/Clang)
+description: Configure your preferred package manager (npm/pnpm/yarn/bun)
 disable-model-invocation: true
 ---
 
-# Build System Setup
+# Package Manager Setup
 
-Configure your preferred build system and compiler for C++20 HPC projects.
+Configure your preferred package manager for this project or globally.
 
 ## Usage
 
 ```bash
-# Detect current build system and compiler
-node scripts/setup-build-system.js --detect
+# Detect current package manager
+node scripts/setup-package-manager.js --detect
 
-# Set global build system preference
-node scripts/setup-build-system.js --global cmake
+# Set global preference
+node scripts/setup-package-manager.js --global pnpm
 
-# List available build systems and compilers
-node scripts/setup-build-system.js --list
+# Set project preference
+node scripts/setup-package-manager.js --project bun
+
+# List available package managers
+node scripts/setup-package-manager.js --list
 ```
 
 ## Detection Priority
 
-When determining which build system to use, the following order is checked:
+When determining which package manager to use, the following order is checked:
 
-1. **Environment variable**: `CLAUDE_BUILD_SYSTEM`
-2. **Project config**: `.claude/build-system.json`
-3. **Project files**: Presence of CMakeLists.txt or Makefile
-4. **Global config**: `~/.claude/build-system.json`
-5. **Fallback**: First available build system (cmake > make)
-
-## Compiler Detection
-
-Compiler selection priority:
-
-1. **Environment variable**: `CLAUDE_CXX_COMPILER`
-2. **System detection**: First available (clang++ > g++)
-3. **Default**: g++
+1. **Environment variable**: `CLAUDE_PACKAGE_MANAGER`
+2. **Project config**: `.claude/package-manager.json`
+3. **package.json**: `packageManager` field
+4. **Lock file**: Presence of package-lock.json, yarn.lock, pnpm-lock.yaml, or bun.lockb
+5. **Global config**: `~/.claude/package-manager.json`
+6. **Fallback**: First available package manager (pnpm > bun > yarn > npm)
 
 ## Configuration Files
 
 ### Global Configuration
 ```json
-// ~/.claude/build-system.json
+// ~/.claude/package-manager.json
 {
-  "buildSystem": "cmake"
+  "packageManager": "pnpm"
 }
 ```
 
 ### Project Configuration
 ```json
-// .claude/build-system.json
+// .claude/package-manager.json
 {
-  "buildSystem": "cmake"
+  "packageManager": "bun"
 }
 ```
 
-## Environment Variables
+### package.json
+```json
+{
+  "packageManager": "pnpm@8.6.0"
+}
+```
+
+## Environment Variable
+
+Set `CLAUDE_PACKAGE_MANAGER` to override all other detection methods:
 
 ```bash
-# Set build system
-export CLAUDE_BUILD_SYSTEM=cmake
+# Windows (PowerShell)
+$env:CLAUDE_PACKAGE_MANAGER = "pnpm"
 
-# Set compiler
-export CLAUDE_CXX_COMPILER=clang++
+# macOS/Linux
+export CLAUDE_PACKAGE_MANAGER=pnpm
 ```
 
 ## Run the Detection
 
-To see current build system detection results, run:
+To see current package manager detection results, run:
 
 ```bash
-node scripts/setup-build-system.js --detect
+node scripts/setup-package-manager.js --detect
 ```

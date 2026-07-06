@@ -1,5 +1,5 @@
 ---
-description: Analyze the current session and extract reusable patterns worth saving as skills for future use.
+description: Extract reusable patterns from the current session and save them as candidate skills or guidance.
 ---
 
 # /learn - Extract Reusable Patterns

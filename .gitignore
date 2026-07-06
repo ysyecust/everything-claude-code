@@ -25,7 +25,8 @@ Desktop.ini
 
 # Editor files
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 *.swp
 *.swo
 *~
@@ -43,6 +44,7 @@ yarn-error.log*
 .pnpm-debug.log*
 .yarn/
 lerna-debug.log*
+*.tgz
 
 # Build outputs
 dist/
@@ -75,6 +77,10 @@ examples/sessions/*.tmp
 # Local drafts
 marketing/
 .dmux/
+.dmux-hooks/
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Temporary files
 tmp/
@@ -82,6 +88,9 @@ temp/
 *.tmp
 *.bak
 *.backup
+
+# Observer temp files (continuous-learning-v2)
+.observer-tmp/
 
 # Rust build artifacts
 ecc2/target/
@@ -92,35 +101,4 @@ ecc2/target/
 .opencode/node_modules/
 assets/images/security/badrudi-exploit.mp4
 
-# C++ build artifacts
-build/
-cmake-build-*/
-*.o
-*.obj
-*.a
-*.lib
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
-
-# C++ compiler intermediates
-*.d
-*.gcno
-*.gcda
-*.gcov
-
-# CMake generated
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-CTestTestfile.cmake
-Testing/
-
-# Compilation database
-compile_commands.json
-
-# Conan / vcpkg
-conan/
-vcpkg_installed/
+.aider*

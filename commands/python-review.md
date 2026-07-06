@@ -89,7 +89,7 @@ Agent:
 ## Static Analysis Results
 ✓ ruff: No issues
 ✓ mypy: No errors
-⚠️ black: 2 files need reformatting
+WARNING: black: 2 files need reformatting
 ✓ bandit: No security issues
 
 ## Issues Found
@@ -155,7 +155,7 @@ with open("config.json") as f:  # Good
 - HIGH: 1
 - MEDIUM: 2
 
-Recommendation: ❌ Block merge until CRITICAL issue is fixed
+Recommendation: FAIL: Block merge until CRITICAL issue is fixed
 
 ## Formatting Required
 Run: `black app/routes/user.py app/services/auth.py`
@@ -165,13 +165,13 @@ Run: `black app/routes/user.py app/services/auth.py`
 
 | Status | Condition |
 |--------|-----------|
-| ✅ Approve | No CRITICAL or HIGH issues |
-| ⚠️ Warning | Only MEDIUM issues (merge with caution) |
-| ❌ Block | CRITICAL or HIGH issues found |
+| PASS: Approve | No CRITICAL or HIGH issues |
+| WARNING: Warning | Only MEDIUM issues (merge with caution) |
+| FAIL: Block | CRITICAL or HIGH issues found |
 
 ## Integration with Other Commands
 
-- Use `/tdd` first to ensure tests pass
+- Use the `tdd-workflow` skill first to ensure tests pass
 - Use `/code-review` for non-Python specific concerns
 - Use `/python-review` before committing
 - Use `/build-fix` if static analysis tools fail

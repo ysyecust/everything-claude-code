@@ -1,5 +1,5 @@
 ---
-description: Save a verification checkpoint of the current session state with metadata for later restoration.
+description: Create, verify, or list workflow checkpoints after running verification checks.
 ---
 
 # Checkpoint Command

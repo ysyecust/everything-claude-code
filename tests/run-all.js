@@ -67,15 +67,25 @@ for (const testFile of testFiles) {
   const displayPath = testFile.split(path.sep).join('/');
 
   if (!fs.existsSync(testPath)) {
-    console.log(`⚠ Skipping ${displayPath} (file not found)`);
+    console.log(`WARNING Skipping ${displayPath} (file not found)`);
     continue;
   }
 
   console.log(`\n━━━ Running ${displayPath} ━━━`);
 
+  // Run each test hermetically: strip inherited git env vars. When the suite
+  // runs inside a git hook (e.g. pre-push), git sets GIT_DIR/GIT_WORK_TREE,
+  // which would hijack `git -C <dir>` calls in tests that exercise real git
+  // and make them operate on the host repo instead of their own fixtures.
+  const childEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_PREFIX']) {
+    delete childEnv[key];
+  }
+
   const result = spawnSync('node', [testPath], {
     encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: childEnv
   });
 
   const stdout = result.stdout || '';

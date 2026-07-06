@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -17,32 +18,92 @@ permissions:
 
 jobs:
   test:
-    name: Test (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }}, ${{ matrix.pm }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: ['18.x', '20.x', '22.x']
+        pm: [npm, pnpm, yarn, bun]
+        exclude:
+          # Bun has limited Windows support
+          - os: windows-latest
+            pm: bun
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ matrix.node }}
 
+      # Package manager setup
+      - name: Setup pnpm
+        if: matrix.pm == 'pnpm' && matrix.node != '18.x'
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          # Keep an explicit pnpm major because this repo's packageManager is Yarn.
+          version: 10
+
+      - name: Setup pnpm (via Corepack)
+        if: matrix.pm == 'pnpm' && matrix.node == '18.x'
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+
+      - name: Setup Yarn (via Corepack)
+        if: matrix.pm == 'yarn'
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare yarn@stable --activate
+
+      - name: Setup Bun
+        if: matrix.pm == 'bun'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      # Install dependencies
+      # COREPACK_ENABLE_STRICT=0 allows pnpm to install even though
+      # package.json declares "packageManager": "yarn@..."
+      - name: Install dependencies
+        shell: bash
+        env:
+          COREPACK_ENABLE_STRICT: '0'
+          npm_config_ignore_scripts: 'true'
+          YARN_ENABLE_SCRIPTS: 'false'
+        run: |
+          case "${{ matrix.pm }}" in
+            npm) npm ci --ignore-scripts ;;
+            # pnpm v10 can fail CI on ignored native build scripts
+            # (for example msgpackr-extract) even though this repo is Yarn-native
+            # and pnpm is only exercised here as a compatibility lane.
+            pnpm) pnpm install --ignore-scripts --config.strict-dep-builds=false --no-frozen-lockfile ;;
+            # Yarn Berry (v4+) removed --ignore-engines; engine checking is no longer a core feature
+            yarn) yarn install --mode=skip-build ;;
+            bun) bun install --ignore-scripts ;;
+            *) echo "Unsupported package manager: ${{ matrix.pm }}" && exit 1 ;;
+          esac
+
+      # Run tests
       - name: Run tests
         run: node tests/run-all.js
+        env:
+          CLAUDE_CODE_PACKAGE_MANAGER: ${{ matrix.pm }}
 
+      # Upload test artifacts on failure
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-results-node${{ matrix.node }}
+          name: test-results-${{ matrix.os }}-node${{ matrix.node }}-${{ matrix.pm }}
           path: |
             tests/
             !tests/node_modules/
@@ -54,10 +115,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20.x'
 
@@ -84,6 +147,10 @@ jobs:
         run: node scripts/ci/validate-install-manifests.js
         continue-on-error: false
 
+      - name: Validate workflow security
+        run: node scripts/ci/validate-workflow-security.js
+        continue-on-error: false
+
       - name: Validate rules
         run: node scripts/ci/validate-rules.js
         continue-on-error: false
@@ -92,6 +159,40 @@ jobs:
         run: node scripts/ci/catalog.js --text
         continue-on-error: false
 
+      - name: Validate command registry
+        run: npm run command-registry:check
+        continue-on-error: false
+
+      - name: Check unicode safety
+        run: node scripts/ci/check-unicode-safety.js
+        continue-on-error: false
+
+      - name: Validate no personal paths
+        run: node scripts/ci/validate-no-personal-paths.js
+        continue-on-error: false
+
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+
+      - name: Run Python tests
+        run: python -m pytest tests/test_*.py -m "not integration"
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -99,90 +200,73 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20.x'
 
-      - name: Run security scan
-        run: echo "Security scan placeholder"
+      - name: Install audit dependencies
+        run: npm ci --ignore-scripts
 
-  cpp-build:
-    name: C++ Build (${{ matrix.compiler }})
+      - name: Run npm audit
+        run: |
+          npm audit signatures
+          npm audit --audit-level=high
+
+      - name: Run supply-chain IOC scan
+        run: npm run security:ioc-scan
+
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [g++, clang++]
-        include:
-          - compiler: g++
-            cc: gcc
-            install: ''
-          - compiler: clang++
-            cc: clang
-            install: ''
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
-      - name: Install compiler
-        if: matrix.install != ''
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ${{ matrix.install }}
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20.x'
 
-      - name: Detect CMakeLists.txt
-        id: detect
-        run: |
-          if [ -f CMakeLists.txt ]; then
-            echo "has_cmake=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_cmake=false" >> $GITHUB_OUTPUT
-            echo "No CMakeLists.txt found - skipping C++ build"
-          fi
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Configure CMake
-        if: steps.detect.outputs.has_cmake == 'true'
-        run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
-            -DCMAKE_BUILD_TYPE=Release
-        env:
-          CXX: ${{ matrix.compiler }}
-          CC: ${{ matrix.cc }}
+      - name: Run coverage
+        run: npm run coverage
 
-      - name: Build
-        if: steps.detect.outputs.has_cmake == 'true'
-        run: cmake --build build --parallel $(nproc)
-
-      - name: Test
-        if: steps.detect.outputs.has_cmake == 'true'
-        run: ctest --test-dir build --output-on-failure
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-ubuntu-node20-npm
+          path: coverage/
 
   lint:
-    name: Lint Markdown
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20.x'
 
-      - name: Install markdownlint
-        run: npm install -g markdownlint-cli
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Run markdownlint
-        run: |
-          markdownlint "agents/**/*.md" "skills/**/*.md" "commands/**/*.md" "rules/**/*.md" \
-            --config .markdownlint.json || true
+      - name: Run lint
+        run: npm run lint

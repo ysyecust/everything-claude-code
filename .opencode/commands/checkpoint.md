@@ -1,6 +1,6 @@
 ---
 description: Save verification state and progress checkpoint
-agent: build
+agent: everything-claude-code:build
 ---
 
 # Checkpoint Command
@@ -28,7 +28,7 @@ Create a snapshot of current progress including:
 - Coverage: XX%
 
 **Build**
-- Status: ✅ Passing / ❌ Failing
+- Status: PASS: Passing / FAIL: Failing
 - Errors: [if any]
 
 **Changes Since Last Checkpoint**

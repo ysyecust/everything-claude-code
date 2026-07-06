@@ -1,3 +1,7 @@
+---
+description: Analyze coverage, identify gaps, and generate missing tests toward the target threshold.
+---
+
 # Test Coverage
 
 Analyze test coverage, identify gaps, and generate missing tests to reach 80%+ coverage.
@@ -57,7 +61,7 @@ File                   Before  After
 src/services/auth.ts   45%     88%
 src/utils/validation.ts 32%    82%
 ──────────────────────────────
-Overall:               67%     84%  ✅
+Overall:               67%     84%  PASS:
 ```
 
 ## Focus Areas

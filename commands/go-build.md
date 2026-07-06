@@ -140,7 +140,7 @@ ok      project/internal/handler   0.023s
 | Files modified | 2 |
 | Remaining issues | 0 |
 
-Build Status: ✅ SUCCESS
+Build Status: PASS: SUCCESS
 ```
 
 ## Common Errors Fixed
@@ -175,7 +175,7 @@ The agent will stop and report if:
 
 - `/go-test` - Run tests after build succeeds
 - `/go-review` - Review code quality
-- `/verify` - Full verification loop
+- `verification-loop` skill - Full verification loop
 
 ## Related
 

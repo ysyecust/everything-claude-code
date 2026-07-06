@@ -1,5 +1,5 @@
 ---
-description: Sync documentation from source-of-truth. Update READMEs, API docs, and guides to reflect current codebase state.
+description: Sync documentation from source-of-truth files such as scripts, schemas, routes, and exports.
 ---
 
 # Update Documentation

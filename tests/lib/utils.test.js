@@ -27,6 +27,8 @@ function test(name, fn) {
 
 // Test suite
 function runTests() {
+  const rocketParty = String.fromCodePoint(0x1F680, 0x1F389);
+  const partyEmoji = String.fromCodePoint(0x1F389);
   console.log('\n=== Testing utils.js ===\n');
 
   let passed = 0;
@@ -58,6 +60,50 @@ function runTests() {
     assert.ok(fs.existsSync(home), 'Home dir should exist');
   })) passed++; else failed++;
 
+  if (test('getHomeDir prefers HOME override when set', () => {
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    const fakeHome = path.join(process.cwd(), 'tmp-home-override');
+    try {
+      process.env.HOME = fakeHome;
+      process.env.USERPROFILE = '';
+      assert.strictEqual(utils.getHomeDir(), fakeHome);
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+    }
+  })) passed++; else failed++;
+
+  if (test('getHomeDir falls back to USERPROFILE when HOME is empty', () => {
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    const fakeHome = path.join(process.cwd(), 'tmp-userprofile-override');
+    try {
+      process.env.HOME = '';
+      process.env.USERPROFILE = fakeHome;
+      assert.strictEqual(utils.getHomeDir(), fakeHome);
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+    }
+  })) passed++; else failed++;
+
   if (test('getClaudeDir returns path under home', () => {
     const claudeDir = utils.getClaudeDir();
     const homeDir = utils.getHomeDir();
@@ -69,7 +115,79 @@ function runTests() {
     const sessionsDir = utils.getSessionsDir();
     const claudeDir = utils.getClaudeDir();
     assert.ok(sessionsDir.startsWith(claudeDir), 'Sessions should be under Claude dir');
-    assert.ok(sessionsDir.endsWith(path.join('.claude', 'session-data')) || sessionsDir.endsWith('/.claude/session-data'), 'Should use canonical session-data directory');
+    assert.ok(sessionsDir.endsWith('session-data'), 'Should use canonical session-data directory');
+  })) passed++; else failed++;
+
+  if (test('getAgentDataHome honors ECC_AGENT_DATA_HOME', () => {
+    const original = process.env.ECC_AGENT_DATA_HOME;
+    const overrideRoot = path.join(utils.getTempDir(), `ecc-agent-data-${Date.now()}`);
+    try {
+      process.env.ECC_AGENT_DATA_HOME = overrideRoot;
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      const reloaded = require('../../scripts/lib/utils');
+      assert.strictEqual(reloaded.getAgentDataHome(), path.resolve(overrideRoot));
+      assert.strictEqual(reloaded.getClaudeDir(), path.resolve(overrideRoot));
+      assert.strictEqual(
+        reloaded.getSessionsDir(),
+        path.join(path.resolve(overrideRoot), 'session-data')
+      );
+      assert.strictEqual(
+        reloaded.getLearnedSkillsDir(),
+        path.join(path.resolve(overrideRoot), 'skills', 'learned')
+      );
+    } finally {
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      if (original === undefined) {
+        delete process.env.ECC_AGENT_DATA_HOME;
+      } else {
+        process.env.ECC_AGENT_DATA_HOME = original;
+      }
+    }
+  })) passed++; else failed++;
+
+  if (test('getAgentDataHome defaults to ~/.cursor/ecc when CURSOR_VERSION is set', () => {
+    const originalVersion = process.env.CURSOR_VERSION;
+    const originalHome = process.env.ECC_AGENT_DATA_HOME;
+    try {
+      delete process.env.ECC_AGENT_DATA_HOME;
+      process.env.CURSOR_VERSION = 'test-cursor';
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      delete require.cache[require.resolve('../../scripts/lib/agent-data-home')];
+      const reloaded = require('../../scripts/lib/utils');
+      const expected = path.join(reloaded.getHomeDir(), '.cursor', 'ecc');
+      assert.strictEqual(reloaded.getAgentDataHome(), expected);
+    } finally {
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      delete require.cache[require.resolve('../../scripts/lib/agent-data-home')];
+      if (originalVersion === undefined) {
+        delete process.env.CURSOR_VERSION;
+      } else {
+        process.env.CURSOR_VERSION = originalVersion;
+      }
+      if (originalHome === undefined) {
+        delete process.env.ECC_AGENT_DATA_HOME;
+      } else {
+        process.env.ECC_AGENT_DATA_HOME = originalHome;
+      }
+    }
+  })) passed++; else failed++;
+
+  if (test('getAgentDataHome expands tilde in ECC_AGENT_DATA_HOME', () => {
+    const original = process.env.ECC_AGENT_DATA_HOME;
+    try {
+      process.env.ECC_AGENT_DATA_HOME = path.join('~', '.cursor', 'ecc-test');
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      const reloaded = require('../../scripts/lib/utils');
+      const expected = path.join(reloaded.getHomeDir(), '.cursor', 'ecc-test');
+      assert.strictEqual(reloaded.getAgentDataHome(), expected);
+    } finally {
+      delete require.cache[require.resolve('../../scripts/lib/utils')];
+      if (original === undefined) {
+        delete process.env.ECC_AGENT_DATA_HOME;
+      } else {
+        process.env.ECC_AGENT_DATA_HOME = original;
+      }
+    }
   })) passed++; else failed++;
 
   if (test('getSessionSearchDirs includes canonical and legacy paths', () => {
@@ -166,7 +284,7 @@ function runTests() {
   if (test('sanitizeSessionId returns stable hashes for non-ASCII values', () => {
     const chinese = utils.sanitizeSessionId('我的项目');
     const cyrillic = utils.sanitizeSessionId('проект');
-    const emoji = utils.sanitizeSessionId('🚀🎉');
+    const emoji = utils.sanitizeSessionId(rocketParty);
     assert.ok(/^[a-f0-9]{8}$/.test(chinese), `Expected 8-char hash, got: ${chinese}`);
     assert.ok(/^[a-f0-9]{8}$/.test(cyrillic), `Expected 8-char hash, got: ${cyrillic}`);
     assert.ok(/^[a-f0-9]{8}$/.test(emoji), `Expected 8-char hash, got: ${emoji}`);
@@ -707,7 +825,7 @@ function runTests() {
   if (test('writeFile handles unicode content', () => {
     const testFile = path.join(utils.getTempDir(), `utils-test-${Date.now()}.txt`);
     try {
-      const unicode = '日本語テスト 🚀 émojis';
+      const unicode = `日本語テスト ${String.fromCodePoint(0x1F680)} émojis`;
       utils.writeFile(testFile, unicode);
       const content = utils.readFile(testFile);
       assert.strictEqual(content, unicode);
@@ -1369,7 +1487,19 @@ function runTests() {
     const realFile = path.join(tmpDir, 'real.txt');
     fs.writeFileSync(realFile, 'content');
     const brokenLink = path.join(tmpDir, 'broken.txt');
-    fs.symlinkSync('/nonexistent/path/does/not/exist', brokenLink);
+    try {
+      fs.symlinkSync('/nonexistent/path/does/not/exist', brokenLink);
+    } catch (err) {
+      // Skip only where symlink creation is blocked (e.g. Windows without
+      // Developer Mode / admin rights → EPERM/EACCES); rethrow anything else
+      // so real failures aren't masked.
+      if (err && (err.code === 'EPERM' || err.code === 'EACCES')) {
+        console.log('    (skipped — symlinks not supported)');
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        return;
+      }
+      throw err;
+    }
 
     try {
       const results = utils.findFiles(tmpDir, '*.txt');
@@ -1877,8 +2007,8 @@ function runTests() {
     const tmpDir = fs.mkdtempSync(path.join(utils.getTempDir(), 'r108-grep-unicode-'));
     const testFile = path.join(tmpDir, 'test.txt');
     try {
-      fs.writeFileSync(testFile, '🎉 celebration\nnormal line\n🎉 party\n日本語テスト');
-      const emojiResults = utils.grepFile(testFile, /🎉/);
+      fs.writeFileSync(testFile, `${partyEmoji} celebration\nnormal line\n${partyEmoji} party\n日本語テスト`);
+      const emojiResults = utils.grepFile(testFile, new RegExp(partyEmoji, 'u'));
       assert.strictEqual(emojiResults.length, 2,
         'Should find emoji on 2 lines (lines 1 and 3)');
       assert.strictEqual(emojiResults[0].lineNumber, 1);

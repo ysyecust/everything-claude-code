@@ -15,6 +15,9 @@ const isMacOS = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
 const SESSION_DATA_DIR_NAME = 'session-data';
 const LEGACY_SESSIONS_DIR_NAME = 'sessions';
+const {
+  resolveAgentDataHome,
+} = require('./agent-data-home');
 const WINDOWS_RESERVED_SESSION_IDS = new Set([
   'CON', 'PRN', 'AUX', 'NUL',
   'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -25,15 +28,27 @@ const WINDOWS_RESERVED_SESSION_IDS = new Set([
  * Get the user's home directory (cross-platform)
  */
 function getHomeDir() {
+  const explicitHome = process.env.HOME || process.env.USERPROFILE;
+  if (explicitHome && explicitHome.trim().length > 0) {
+    return path.resolve(explicitHome);
+  }
   return os.homedir();
 }
 
 /**
- * Get the Claude config directory
+ * ECC agent data root for memory persistence (see scripts/lib/agent-data-home.js).
+ */
+function getAgentDataHome() {
+  return resolveAgentDataHome();
+}
+
+/**
+ * Get the Claude config directory (alias of getAgentDataHome for backwards compatibility).
  */
 function getClaudeDir() {
-  return path.join(getHomeDir(), '.claude');
+  return getAgentDataHome();
 }
+
 
 /**
  * Get the sessions directory
@@ -581,6 +596,7 @@ module.exports = {
 
   // Directories
   getHomeDir,
+  getAgentDataHome,
   getClaudeDir,
   getSessionsDir,
   getLegacySessionsDir,

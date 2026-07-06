@@ -207,6 +207,39 @@ function runTests() {
     }
   })) passed++; else failed++;
 
+  if (test('does not misclassify preact as react (substring guard)', () => {
+    const dir = createTempDir();
+    try {
+      writeTestFile(dir, 'package.json', '{"dependencies":{"preact":"10.0.0"}}');
+      const result = detectProjectType(dir);
+      assert.ok(!result.frameworks.includes('react'), `preact wrongly detected as react: ${JSON.stringify(result.frameworks)}`);
+    } finally {
+      cleanupDir(dir);
+    }
+  })) passed++; else failed++;
+
+  if (test('does not misclassify reactive as react (substring guard)', () => {
+    const dir = createTempDir();
+    try {
+      writeTestFile(dir, 'package.json', '{"dependencies":{"reactive":"1.0.0"}}');
+      const result = detectProjectType(dir);
+      assert.ok(!result.frameworks.includes('react'), `reactive wrongly detected as react: ${JSON.stringify(result.frameworks)}`);
+    } finally {
+      cleanupDir(dir);
+    }
+  })) passed++; else failed++;
+
+  if (test('still detects react from react-dom alone (prefix-delimiter match preserved)', () => {
+    const dir = createTempDir();
+    try {
+      writeTestFile(dir, 'package.json', '{"dependencies":{"react-dom":"18.0.0"}}');
+      const result = detectProjectType(dir);
+      assert.ok(result.frameworks.includes('react'), `react-dom should still map to react: ${JSON.stringify(result.frameworks)}`);
+    } finally {
+      cleanupDir(dir);
+    }
+  })) passed++; else failed++;
+
   if (test('detects angular from angular.json', () => {
     const dir = createTempDir();
     try {
@@ -215,6 +248,35 @@ function runTests() {
       writeTestFile(dir, 'package.json', '{"dependencies":{"@angular/core":"17.0.0"}}');
       const result = detectProjectType(dir);
       assert.ok(result.frameworks.includes('angular'));
+    } finally {
+      cleanupDir(dir);
+    }
+  })) passed++; else failed++;
+
+  console.log('\nC Detection:');
+
+  if (test('detects c from top-level .c files', () => {
+    const dir = createTempDir();
+    try {
+      writeTestFile(dir, 'main.c', 'int main(void) { return 0; }\n');
+      const result = detectProjectType(dir);
+      assert.ok(result.languages.includes('c'));
+      assert.strictEqual(result.primary, 'c');
+    } finally {
+      cleanupDir(dir);
+    }
+  })) passed++; else failed++;
+
+  console.log('\nF# Detection:');
+
+  if (test('detects fsharp from project and source files', () => {
+    const dir = createTempDir();
+    try {
+      writeTestFile(dir, 'App.fsproj', '<Project Sdk="Microsoft.NET.Sdk"></Project>');
+      writeTestFile(dir, 'Program.fs', 'printfn "hello"\n');
+      const result = detectProjectType(dir);
+      assert.ok(result.languages.includes('fsharp'));
+      assert.strictEqual(result.primary, 'fsharp');
     } finally {
       cleanupDir(dir);
     }

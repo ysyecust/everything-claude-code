@@ -23,7 +23,7 @@ React, Next.js ve performanslı kullanıcı arayüzleri için modern frontend ka
 ### Kalıtım Yerine Composition
 
 ```typescript
-// ✅ İYİ: Bileşen composition
+// PASS: İYİ: Bileşen composition
 interface CardProps {
   children: React.ReactNode
   variant?: 'default' | 'outlined'
@@ -169,28 +169,42 @@ export function useQuery<T>(
   const [error, setError] = useState<Error | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Çağıranlar satır içi fonksiyonlar ve nesne literalleri geçirse bile
+  // refetch'in referans olarak kararlı kalması için en güncel fetcher/options
+  // değerlerini ref'lerde tutun. Bu olmadan her render yeni bir refetch
+  // oluşturur ve aşağıdaki effect her state güncellemesinden sonra yeniden
+  // çalışır - sonsuz bir fetch döngüsü.
+  const fetcherRef = useRef(fetcher)
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    fetcherRef.current = fetcher
+    optionsRef.current = options
+  })
+
   const refetch = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const result = await fetcher()
+      const result = await fetcherRef.current()
       setData(result)
-      options?.onSuccess?.(result)
+      optionsRef.current?.onSuccess?.(result)
     } catch (err) {
       const error = err as Error
       setError(error)
-      options?.onError?.(error)
+      optionsRef.current?.onError?.(error)
     } finally {
       setLoading(false)
     }
-  }, [fetcher, options])
+  }, [])
+
+  const enabled = options?.enabled !== false
 
   useEffect(() => {
-    if (options?.enabled !== false) {
+    if (enabled) {
       refetch()
     }
-  }, [key, refetch, options?.enabled])
+  }, [key, enabled, refetch])
 
   return { data, error, loading, refetch }
 }
@@ -294,17 +308,18 @@ export function useMarkets() {
 ### Memoization
 
 ```typescript
-// ✅ Pahalı hesaplamalar için useMemo
+// PASS: Pahalı hesaplamalar için useMemo
+// Sıralamadan önce kopyalayın - Array.prototype.sort yerinde değiştirir
 const sortedMarkets = useMemo(() => {
-  return markets.sort((a, b) => b.volume - a.volume)
+  return [...markets].sort((a, b) => b.volume - a.volume)
 }, [markets])
 
-// ✅ Alt bileşenlere geçirilen fonksiyonlar için useCallback
+// PASS: Alt bileşenlere geçirilen fonksiyonlar için useCallback
 const handleSearch = useCallback((query: string) => {
   setSearchQuery(query)
 }, [])
 
-// ✅ Pure bileşenler için React.memo
+// PASS: Pure bileşenler için React.memo
 export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
   return (
     <div className="market-card">
@@ -320,7 +335,7 @@ export const MarketCard = React.memo<MarketCardProps>(({ market }) => {
 ```typescript
 import { lazy, Suspense } from 'react'
 
-// ✅ Ağır bileşenleri lazy yükle
+// PASS: Ağır bileşenleri lazy yükle
 const HeavyChart = lazy(() => import('./HeavyChart'))
 const ThreeJsBackground = lazy(() => import('./ThreeJsBackground'))
 
@@ -515,7 +530,7 @@ export class ErrorBoundary extends React.Component<
 ```typescript
 import { motion, AnimatePresence } from 'framer-motion'
 
-// ✅ Liste animasyonları
+// PASS: Liste animasyonları
 export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   return (
     <AnimatePresence>
@@ -534,7 +549,7 @@ export function AnimatedMarketList({ markets }: { markets: Market[] }) {
   )
 }
 
-// ✅ Modal animasyonları
+// PASS: Modal animasyonları
 export function Modal({ isOpen, onClose, children }: ModalProps) {
   return (
     <AnimatePresence>

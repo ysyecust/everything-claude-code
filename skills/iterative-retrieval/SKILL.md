@@ -1,7 +1,8 @@
 ---
 name: iterative-retrieval
 description: Pattern for progressively refining context retrieval to solve the subagent context problem
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Iterative Retrieval Pattern
@@ -36,12 +37,12 @@ A 4-phase loop that progressively refines context:
 ┌─────────────────────────────────────────────┐
 │                                             │
 │   ┌──────────┐      ┌──────────┐            │
-│   │ DISPATCH │─────▶│ EVALUATE │            │
+│   │ DISPATCH │─────│ EVALUATE │            │
 │   └──────────┘      └──────────┘            │
 │        ▲                  │                 │
 │        │                  ▼                 │
 │   ┌──────────┐      ┌──────────┐            │
-│   │   LOOP   │◀─────│  REFINE  │            │
+│   │   LOOP   │─────│  REFINE  │            │
 │   └──────────┘      └──────────┘            │
 │                                             │
 │        Max 3 cycles, then proceed           │
@@ -52,16 +53,32 @@ A 4-phase loop that progressively refines context:
 
 Initial broad query to gather candidate files:
 
-```
-Start with high-level intent:
-  patterns: src/**/*.cpp, include/**/*.hpp
-  keywords: relevant domain terms
-  excludes: *_test.cpp, *_bench.cpp
+```javascript
+// Start with high-level intent
+const initialQuery = {
+  patterns: ['src/**/*.ts', 'lib/**/*.ts'],
+  keywords: ['authentication', 'user', 'session'],
+  excludes: ['*.test.ts', '*.spec.ts']
+};
+
+// Dispatch to retrieval agent
+const candidates = await retrieveFiles(initialQuery);
 ```
 
 ### Phase 2: EVALUATE
 
 Assess retrieved content for relevance:
+
+```javascript
+function evaluateRelevance(files, task) {
+  return files.map(file => ({
+    path: file.path,
+    relevance: scoreRelevance(file.content, task),
+    reason: explainRelevance(file.content, task),
+    missingContext: identifyGaps(file.content, task)
+  }));
+}
+```
 
 Scoring criteria:
 - **High (0.8-1.0)**: Directly implements target functionality
@@ -72,61 +89,99 @@ Scoring criteria:
 ### Phase 3: REFINE
 
 Update search criteria based on evaluation:
-- Add new patterns discovered in high-relevance files
-- Add terminology found in codebase
-- Exclude confirmed irrelevant paths
-- Target specific gaps
+
+```javascript
+function refineQuery(evaluation, previousQuery) {
+  return {
+    // Add new patterns discovered in high-relevance files
+    patterns: [...previousQuery.patterns, ...extractPatterns(evaluation)],
+
+    // Add terminology found in codebase
+    keywords: [...previousQuery.keywords, ...extractKeywords(evaluation)],
+
+    // Exclude confirmed irrelevant paths
+    excludes: [...previousQuery.excludes, ...evaluation
+      .filter(e => e.relevance < 0.2)
+      .map(e => e.path)
+    ],
+
+    // Target specific gaps
+    focusAreas: evaluation
+      .flatMap(e => e.missingContext)
+      .filter(unique)
+  };
+}
+```
 
 ### Phase 4: LOOP
 
-Repeat with refined criteria (max 3 cycles).
+Repeat with refined criteria (max 3 cycles):
 
-Stop when:
-- 3+ high-relevance files found
-- No critical gaps remain
-- Max cycles reached
+```javascript
+async function iterativeRetrieve(task, maxCycles = 3) {
+  let query = createInitialQuery(task);
+  let bestContext = [];
+
+  for (let cycle = 0; cycle < maxCycles; cycle++) {
+    const candidates = await retrieveFiles(query);
+    const evaluation = evaluateRelevance(candidates, task);
+
+    // Check if we have sufficient context
+    const highRelevance = evaluation.filter(e => e.relevance >= 0.7);
+    if (highRelevance.length >= 3 && !hasCriticalGaps(evaluation)) {
+      return highRelevance;
+    }
+
+    // Refine and continue
+    query = refineQuery(evaluation, query);
+    bestContext = mergeContext(bestContext, highRelevance);
+  }
+
+  return bestContext;
+}
+```
 
 ## Practical Examples
 
 ### Example 1: Bug Fix Context
 
 ```
-Task: "Fix the memory leak in the particle solver"
+Task: "Fix the authentication token expiry bug"
 
 Cycle 1:
-  DISPATCH: Search for "particle", "solver", "allocat" in src/**
-  EVALUATE: Found particle_solver.cpp (0.9), memory_pool.hpp (0.8), main.cpp (0.3)
-  REFINE: Add "arena", "pool" keywords; exclude main.cpp
+  DISPATCH: Search for "token", "auth", "expiry" in src/**
+  EVALUATE: Found auth.ts (0.9), tokens.ts (0.8), user.ts (0.3)
+  REFINE: Add "refresh", "jwt" keywords; exclude user.ts
 
 Cycle 2:
   DISPATCH: Search refined terms
-  EVALUATE: Found arena_allocator.hpp (0.95), smart_ptr_utils.hpp (0.85)
-  REFINE: Sufficient context (4 high-relevance files)
+  EVALUATE: Found session-manager.ts (0.95), jwt-utils.ts (0.85)
+  REFINE: Sufficient context (2 high-relevance files)
 
-Result: particle_solver.cpp, memory_pool.hpp, arena_allocator.hpp, smart_ptr_utils.hpp
+Result: auth.ts, tokens.ts, session-manager.ts, jwt-utils.ts
 ```
 
 ### Example 2: Feature Implementation
 
 ```
-Task: "Add MPI communication to the mesh partitioner"
+Task: "Add rate limiting to API endpoints"
 
 Cycle 1:
-  DISPATCH: Search "MPI", "mesh", "partition" in src/**
-  EVALUATE: No matches for "MPI" - codebase uses "comm" namespace
-  REFINE: Add "comm::", "distribute", "scatter" keywords
+  DISPATCH: Search "rate", "limit", "api" in routes/**
+  EVALUATE: No matches - codebase uses "throttle" terminology
+  REFINE: Add "throttle", "middleware" keywords
 
 Cycle 2:
   DISPATCH: Search refined terms
-  EVALUATE: Found comm_layer.hpp (0.9), mesh_partition.cpp (0.7)
-  REFINE: Need data serialization patterns
+  EVALUATE: Found throttle.ts (0.9), middleware/index.ts (0.7)
+  REFINE: Need router patterns
 
 Cycle 3:
-  DISPATCH: Search "serialize", "pack", "buffer" patterns
-  EVALUATE: Found serializer.hpp (0.8)
+  DISPATCH: Search "router", "express" patterns
+  EVALUATE: Found router-setup.ts (0.8)
   REFINE: Sufficient context
 
-Result: comm_layer.hpp, mesh_partition.cpp, serializer.hpp
+Result: throttle.ts, middleware/index.ts, router-setup.ts
 ```
 
 ## Integration with Agents

@@ -2,6 +2,8 @@
 
 多模型协同规划 - 上下文检索 + 双模型分析 → 生成分步实施计划。
 
+> **前提条件：** 此命令需要外部的 `ccg-workflow` 运行时，它**不**包含在基础 ECC 安装中。请运行 `npx ccg-workflow` 进行初始化，以配置此命令所依赖的 `~/.claude/bin/codeagent-wrapper` 和 `~/.claude/.ccg/prompts/*` 角色文件。没有该运行时，此命令将无法正常运行。
+
 $ARGUMENTS
 
 ***
@@ -209,22 +211,22 @@ mcp__ace-tool__search_context({
 
 3. 以 **粗体文本** 输出提示（必须使用实际保存的文件路径）：
 
-   ***
+***
 
-   **计划已生成并保存至 `.claude/plan/actual-feature-name.md`**
+**计划已生成并保存至 `.claude/plan/actual-feature-name.md`**
 
-   **请审阅以上计划。您可以：**
+**请审阅以上计划。您可以：**
 
-   * **修改计划**：告诉我需要调整的内容，我会更新计划
-   * **执行计划**：复制以下命令到新会话
+* **修改计划**：告诉我需要调整的内容，我会更新计划
+* **执行计划**：复制以下命令到新会话
 
    ```
    /ccg:execute .claude/plan/actual-feature-name.md
    ```
 
-   ***
+***
 
-   **注意**：上面的 `actual-feature-name.md` 必须替换为实际保存的文件名！
+**注意**：上面的 `actual-feature-name.md` 必须替换为实际保存的文件名！
 
 4. **立即终止当前响应**（在此停止。不再进行工具调用。）
 

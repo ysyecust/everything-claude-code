@@ -93,7 +93,7 @@ Agent:
 ## Static Analysis Results
 ✓ ruff: No issues
 ✓ mypy: No errors
-⚠️ black: 2 files need reformatting
+WARNING: black: 2 files need reformatting
 ✓ bandit: No security issues
 
 ## Issues Found
@@ -171,7 +171,7 @@ with open("config.json") as f:  # Good
 * 高：1
 * 中：2
 
-建议：❌ 在关键问题修复前阻止合并
+建议：FAIL: 在关键问题修复前阻止合并
 
 ## 所需的格式化
 
@@ -182,9 +182,9 @@ with open("config.json") as f:  # Good
 
 | 状态 | 条件 |
 |--------|-----------|
-| ✅ 批准 | 无 CRITICAL 或 HIGH 级别问题 |
-| ⚠️ 警告 | 仅存在 MEDIUM 级别问题（谨慎合并） |
-| ❌ 阻止 | 发现 CRITICAL 或 HIGH 级别问题 |
+| PASS: 批准 | 无 CRITICAL 或 HIGH 级别问题 |
+| WARNING: 警告 | 仅存在 MEDIUM 级别问题（谨慎合并） |
+| FAIL: 阻止 | 发现 CRITICAL 或 HIGH 级别问题 |
 
 ## 与其他命令的集成
 
@@ -314,6 +314,6 @@ result = "".join(str(item) for item in items)
 | 海象运算符 (`:=`) | 3.8+ |
 | 仅限位置参数 | 3.8+ |
 | Match 语句 | 3.10+ |
-| 类型联合 (\`x | None\`) | 3.10+ |
+| 类型联合 (`x \| None`) | 3.10+ |
 
 确保你的项目 `pyproject.toml` 或 `setup.py` 指定了正确的最低 Python 版本。

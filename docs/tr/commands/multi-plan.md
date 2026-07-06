@@ -2,6 +2,8 @@
 
 Multi-model işbirlikçi planlama - Context retrieval + Dual-model analiz → Adım adım implementation planı oluştur.
 
+> **Ön koşul:** Bu komut, temel ECC kurulumunun parçası **olmayan** harici `ccg-workflow` runtime'ını gerektirir. Bu komutun bağımlı olduğu `~/.claude/bin/codeagent-wrapper` ve `~/.claude/.ccg/prompts/*` rol dosyalarını sağlamak için `npx ccg-workflow` komutuyla başlatın. Bu runtime olmadan bu komut düzgün çalışmaz.
+
 $ARGUMENTS
 
 ---
@@ -204,18 +206,18 @@ Her iki analizi sentezle, **Adım Adım Implementation Planı** oluştur:
 3. **Kalın metinle** prompt çıktıla (MUTLAKA gerçek kaydedilen dosya yolunu kullan):
 
    ---
-   **Plan oluşturuldu ve `.claude/plan/actual-feature-name.md` dosyasına kaydedildi**
+**Plan oluşturuldu ve `.claude/plan/actual-feature-name.md` dosyasına kaydedildi**
 
-   **Lütfen yukarıdaki planı inceleyin. Şunları yapabilirsiniz:**
-   - **Planı değiştir**: Neyin ayarlanması gerektiğini söyleyin, planı güncelleyeceğim
-   - **Planı çalıştır**: Aşağıdaki komutu yeni bir oturuma kopyalayın
+**Lütfen yukarıdaki planı inceleyin. Şunları yapabilirsiniz:**
+- **Planı değiştir**: Neyin ayarlanması gerektiğini söyleyin, planı güncelleyeceğim
+- **Planı çalıştır**: Aşağıdaki komutu yeni bir oturuma kopyalayın
 
    ```
    /ccg:execute .claude/plan/actual-feature-name.md
    ```
    ---
 
-   **NOT**: Yukarıdaki `actual-feature-name.md` gerçek kaydedilen dosya adıyla değiştirilmelidir!
+**NOT**: Yukarıdaki `actual-feature-name.md` gerçek kaydedilen dosya adıyla değiştirilmelidir!
 
 4. **Mevcut yanıtı hemen sonlandır** (Burada dur. Daha fazla tool çağrısı yok.)
 

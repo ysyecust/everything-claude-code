@@ -28,15 +28,15 @@ curl -s https://api.npmjs.org/downloads/point/last-month/ecc-agentshield
 ### GitHub repository adoption
 
 ```bash
-gh api repos/affaan-m/everything-claude-code \
+gh api repos/affaan-m/ECC \
   --jq '{stars:.stargazers_count,forks:.forks_count,contributors_url:.contributors_url,open_issues:.open_issues_count}'
 ```
 
 ### GitHub traffic (maintainer access required)
 
 ```bash
-gh api repos/affaan-m/everything-claude-code/traffic/views
-gh api repos/affaan-m/everything-claude-code/traffic/clones
+gh api repos/affaan-m/ECC/traffic/views
+gh api repos/affaan-m/ECC/traffic/clones
 ```
 
 ### GitHub App installs
@@ -66,9 +66,9 @@ Use these as starting points in negotiation:
 
 Use this on calls:
 
-> ECC is now positioned as an agent harness performance system, not a config repo.  
-> We track adoption through npm distribution, GitHub App installs, and repository growth.  
-> Claude plugin installs are structurally undercounted publicly, so we use a blended metrics model.  
+> ECC is now positioned as an agent harness performance system, not a config repo.
+> We track adoption through npm distribution, GitHub App installs, and repository growth.
+> Claude plugin installs are structurally undercounted publicly, so we use a blended metrics model.
 > The project supports Claude Code, Cursor, OpenCode, and Codex app/CLI with production-grade hook reliability and a large passing test suite.
 
 For launch-ready social copy snippets, see [`social-launch-copy.md`](./social-launch-copy.md).

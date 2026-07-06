@@ -1,5 +1,5 @@
 ---
-description: Safely identify and remove dead code, unused imports, and duplicate logic with test verification after each removal.
+description: Safely identify and remove dead code with verification after each change.
 ---
 
 # Refactor Clean
@@ -73,7 +73,7 @@ Deleted:   12 unused functions
 Skipped:   2 items (tests failed)
 Saved:     ~450 lines removed
 ──────────────────────────────
-All tests passing ✅
+All tests passing PASS:
 ```
 
 ## Rules

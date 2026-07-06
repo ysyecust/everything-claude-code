@@ -1,5 +1,5 @@
 ---
-description: Scan codebase structure and regenerate architecture documentation in docs/CODEMAPS/ with dependency graphs and module summaries.
+description: Scan project structure and generate token-lean architecture codemaps.
 ---
 
 # Update Codemaps
